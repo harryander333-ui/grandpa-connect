@@ -1,0 +1,126 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grandpa Connect Dashboard</title>
+<style>
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #15191f;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+main {
+  width: min(90%, 480px);
+  text-align: center;
+}
+button {
+  width: 100%;
+  padding: 22px;
+  background: #159447;
+  color: white;
+  border: 0;
+  border-radius: 14px;
+  font-size: 22px;
+  font-weight: bold;
+  cursor: pointer;
+}
+input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px;
+  margin: 8px 0 18px;
+  border-radius: 8px;
+  border: 1px solid #777;
+}
+a { color: #83d8a2; overflow-wrap: anywhere; }
+.result { margin-top: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Grandpa Connect ❤️</h1>
+  <p>Your private support dashboard</p>
+
+  <label for="secret">Private owner secret</label>
+  <input id="secret" type="password"
+         autocomplete="off"
+         placeholder="Enter your private secret">
+
+  <button id="create">CREATE INVITATION</button>
+
+  <div class="result" id="result" aria-live="polite"></div>
+</main>
+
+<script>
+const secret = document.getElementById("secret");
+const create = document.getElementById("create");
+const result = document.getElementById("result");
+
+create.addEventListener("click", async () => {
+  if (!secret.value) {
+    result.textContent = "Enter your owner secret.";
+    return;
+  }
+
+  create.disabled = true;
+  result.textContent = "Creating invitation...";
+
+  try {
+    const response = await fetch("/api/invitations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-owner-secret": secret.value
+      },
+      body: "{}"
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Unable to create invitation");
+    }
+
+    result.innerHTML = "";
+
+    for (const [label, url] of [
+      ["Grandpa's invitation", data.grandpaUrl],
+      ["Your private viewer", data.viewerUrl]
+    ]) {
+      const heading = document.createElement("h3");
+      heading.textContent = label;
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.textContent = url;
+
+      const copy = document.createElement("button");
+      copy.textContent = "COPY " + label.toUpperCase();
+      copy.style.marginTop = "12px";
+      copy.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(url);
+        copy.textContent = "COPIED!";
+      });
+
+      result.append(heading, link, copy);
+    }
+
+    const expiry = document.createElement("p");
+    expiry.textContent = "Invitation expires in 30 minutes.";
+    result.append(expiry);
+
+  } catch (error) {
+    result.textContent = error.message;
+  } finally {
+    create.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
