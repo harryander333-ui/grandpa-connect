@@ -1,0 +1,55 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grandpa Connect</title>
+<style>
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #f5f7f5;
+    font-family: Arial, sans-serif;
+  }
+  button {
+    background: #19a653;
+    color: white;
+    border: none;
+    border-radius: 18px;
+    padding: 28px 65px;
+    font-size: 30px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<button id="accept">ACCEPT</button>
+
+<script>
+document.getElementById("accept").onclick = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false
+    });
+
+    // Screen capture successfully approved.
+    // The next development stage will connect
+    // this stream to the private viewer.
+    alert("Screen sharing permission granted!");
+    
+    stream.getTracks().forEach(track => track.stop());
+  } catch (error) {
+    console.log("Screen sharing was cancelled.");
+  }
+};
+</script>
+
+</body>
+</html>
