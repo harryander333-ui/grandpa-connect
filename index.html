@@ -6,50 +6,69 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grandpa Connect</title>
 <style>
+  * { box-sizing: border-box; }
   body {
     margin: 0;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
     background: #f5f7f5;
     font-family: Arial, sans-serif;
   }
+  main { text-align: center; }
   button {
-    background: #19a653;
+    background: #159447;
     color: white;
-    border: none;
+    border: 0;
     border-radius: 18px;
-    padding: 28px 65px;
+    padding: 30px 75px;
     font-size: 30px;
     font-weight: bold;
     cursor: pointer;
   }
+  button:disabled { opacity: .6; }
+  #status {
+    margin-top: 24px;
+    color: #333;
+    font-size: 16px;
+  }
 </style>
 </head>
 <body>
-
-<button id="accept">ACCEPT</button>
+<main>
+  <button id="accept">ACCEPT</button>
+  <p id="status" aria-live="polite"></p>
+</main>
 
 <script>
-document.getElementById("accept").onclick = async () => {
+const button = document.getElementById("accept");
+const status = document.getElementById("status");
+
+button.addEventListener("click", async () => {
+  button.disabled = true;
+  status.textContent = "Please choose the screen you want to share.";
+
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
       audio: false
     });
 
-    // Screen capture successfully approved.
-    // The next development stage will connect
-    // this stream to the private viewer.
-    alert("Screen sharing permission granted!");
-    
-    stream.getTracks().forEach(track => track.stop());
-  } catch (error) {
-    console.log("Screen sharing was cancelled.");
-  }
-};
-</script>
+    status.textContent = "Screen sharing is active. You can stop sharing at any time.";
 
+    stream.getVideoTracks()[0].addEventListener("ended", () => {
+      status.textContent = "Screen sharing stopped.";
+      button.disabled = false;
+    });
+
+    // This prototype tests browser permission only.
+    // It does not transmit or expose the screen.
+  } catch (error) {
+    status.textContent = "Screen sharing was not started.";
+    button.disabled = false;
+  }
+});
+</script>
+</main>
 </body>
 </html>
