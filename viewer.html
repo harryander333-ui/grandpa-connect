@@ -6,67 +6,177 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grandpa Connect - Viewer</title>
 <style>
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    padding: 30px;
-    background: #15191f;
-    color: white;
-    font-family: Arial, sans-serif;
-    text-align: center;
-  }
-  h1 { margin-bottom: 25px; }
-  input {
-    padding: 14px;
-    border-radius: 8px;
-    border: 1px solid #777;
-    font-size: 18px;
-    width: 220px;
-  }
-  button {
-    padding: 14px 24px;
-    background: #159447;
-    border: 0;
-    border-radius: 8px;
-    color: white;
-    font-size: 17px;
-    cursor: pointer;
-  }
-  video {
-    width: 100%;
-    max-width: 1100px;
-    margin-top: 25px;
-    background: black;
-    border-radius: 12px;
-  }
-  #status { color: #bbb; }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 25px;
+  background: #15191f;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-align: center;
+}
+video {
+  width: 100%;
+  max-width: 1200px;
+  margin-top: 25px;
+  background: black;
+  border-radius: 12px;
+}
+button {
+  padding: 13px 24px;
+  background: #b83232;
+  color: white;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+#status { color: #bbb; }
 </style>
 </head>
 <body>
+
 <h1>Grandpa Connect ❤️</h1>
+<p id="status">Connecting securely...</p>
 
-<p>Private support session</p>
-
-<input id="code" placeholder="Invitation code" autocomplete="off">
-<button id="connect">CONNECT</button>
-
-<p id="status">Waiting for connection...</p>
-
-<video id="screen" autoplay playsinline controls></video>
+<video id="screen" autoplay playsinline muted controls></video>
+<p><button id="stop">END SESSION</button></p>
 
 <script>
-const code = document.getElementById("code");
-const connect = document.getElementById("connect");
 const status = document.getElementById("status");
+const video = document.getElementById("screen");
+const stop = document.getElementById("stop");
 
-connect.addEventListener("click", () => {
-  if (!code.value.trim()) {
-    status.textContent = "Enter your invitation code.";
-    return;
+const token = new URLSearchParams(location.search).get("token");
+
+let socket;
+let peer;
+let stopped = false;
+let pendingCandidates = [];
+
+function finish(message) {
+  if (stopped) return;
+  stopped = true;
+
+  if (peer) peer.close();
+  if (socket) socket.close();
+
+  video.srcObject = null;
+  status.textContent = message;
+}
+
+async function handleOffer(offer) {
+  await peer.setRemoteDescription(offer);
+
+  for (const candidate of pendingCandidates) {
+    await peer.addIceCandidate(candidate);
   }
+  pendingCandidates = [];
 
-  status.textContent =
-    "Connection service is not configured yet.";
+  const answer = await peer.createAnswer();
+  await peer.setLocalDescription(answer);
+
+  socket.send(JSON.stringify({
+    type: "answer",
+    data: peer.localDescription
+  }));
+
+  status.textContent = "Connecting to Grandpa's screen...";
+}
+
+if (!token) {
+  status.textContent = "Invalid or missing invitation.";
+} else {
+  // Remove the invitation token from the visible address.
+  history.replaceState(null, "", location.pathname);
+
+  peer = new RTCPeerConnection({
+    iceServers: [{
+      urls: "stun:stun.l.google.com:19302"
+    }]
+  });
+
+  peer.ontrack = event => {
+    video.srcObject = event.streams[0];
+    status.textContent = "Grandpa's screen is connected ❤️";
+    video.play().catch(() => {});
+  };
+
+  peer.onicecandidate = event => {
+    if (event.candidate && socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: "candidate",
+        data: event.candidate
+      }));
+    }
+  };
+
+  peer.onconnectionstatechange = () => {
+    if (peer.connectionState === "failed") {
+      status.textContent =
+        "Connection failed. Network relay configuration may be needed.";
+    }
+    if (peer.connectionState === "disconnected") {
+      status.textContent = "Connection interrupted.";
+    }
+  };
+
+  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  socket = new WebSocket(
+    `${protocol}//${location.host}/ws?token=${encodeURIComponent(token)}`
+  );
+
+  socket.onopen = () => {
+    status.textContent = "Waiting for Grandpa to accept...";
+  };
+
+  socket.onmessage = async event => {
+    try {
+      const message = JSON.parse(event.data);
+
+      if (message.type === "paired") {
+        status.textContent = "Both browsers connected. Waiting for screen sharing...";
+      }
+
+      if (message.type === "offer") {
+        await handleOffer(message.data);
+      }
+
+      if (message.type === "candidate" && message.data) {
+        const candidate = new RTCIceCandidate(message.data);
+
+        if (peer.remoteDescription) {
+          await peer.addIceCandidate(candidate);
+        } else {
+          pendingCandidates.push(candidate);
+        }
+      }
+
+      if (message.type === "ended") {
+        finish("Grandpa has ended the session.");
+      }
+
+      if (message.type === "expired") {
+        finish("This invitation has expired.");
+      }
+    } catch (error) {
+      status.textContent = "Connection error. Please try again.";
+      console.error(error);
+    }
+  };
+
+  socket.onerror = () => {
+    status.textContent = "Unable to connect to the server.";
+  };
+
+  socket.onclose = () => {
+    if (!stopped) {
+      status.textContent = "Connection closed.";
+    }
+  };
+}
+
+stop.addEventListener("click", () => {
+  finish("You ended the session.");
 });
 </script>
 </body>
