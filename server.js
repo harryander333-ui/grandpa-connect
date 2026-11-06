@@ -1,4 +1,3 @@
-
 const express = require("express");
 const http = require("http");
 const crypto = require("crypto");
@@ -6,12 +5,9 @@ const WebSocket = require("ws");
 const path = require("path");
 
 const app = express();
+app.set("trust proxy", 1); // running behind Render/Railway/Fly/etc.
 const server = http.createServer(app);
-
-const wss = new WebSocket.Server({
-  noServer: true,
-  maxPayload: 65536
-});
+const wss = new WebSocket.Server({ noServer: true, maxPayload: 65536 });
 
 app.use(express.json({ limit: "2kb" }));
 
@@ -22,26 +18,34 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get("/", (req, res) =>
-  res.sendFile(path.join(__dirname, "index.html"))
-);
+for (const [route, file] of [
+  ["/", "index.html"],
+  ["/viewer.html", "viewer.html"],
+  ["/dashboard.html", "dashboard.html"]
+]) {
+  app.get(route, (req, res) => res.sendFile(path.join(__dirname, file)));
+}
 
-app.get("/viewer.html", (req, res) =>
-  res.sendFile(path.join(__dirname, "viewer.html"))
-);
+app.get("/health", (req, res) => res.json({ status: "running" }));
 
-app.get("/dashboard.html", (req, res) =>
-  res.sendFile(path.join(__dirname, "dashboard.html"))
-);
-
-app.get("/health", (req, res) =>
-  res.json({ status: "running" })
-);
+// ---- ICE servers (STUN + optional TURN) -------------------------------
+// STUN alone fails when either side is on mobile data or a strict router.
+// Set ICE_SERVERS_JSON to add a TURN relay, e.g.:
+// [{"urls":"stun:stun.l.google.com:19302"},
+//  {"urls":"turn:YOUR_TURN_HOST:443?transport=tcp","username":"USER","credential":"PASS"}]
+let iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
+if (process.env.ICE_SERVERS_JSON) {
+  try {
+    iceServers = JSON.parse(process.env.ICE_SERVERS_JSON);
+  } catch (e) {
+    console.error("ICE_SERVERS_JSON is not valid JSON - using default STUN only");
+  }
+}
 
 const sessions = new Map();
 const tokens = new Map();
-
-const SESSION_LENGTH = 30 * 60 * 1000;
+const INVITE_LENGTH = 30 * 60 * 1000; // time to accept the invitation
+const CALL_LENGTH = 2 * 60 * 60 * 1000; // total time once both sides are paired
 
 function randomToken() {
   return crypto.randomBytes(32).toString("base64url");
@@ -50,26 +54,37 @@ function randomToken() {
 function secretMatches(a, b) {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
 
-  return x.length === y.length &&
-    crypto.timingSafeEqual(x, y);
+// Basic brute-force protection on the owner secret
+const failures = new Map();
+function isBlocked(ip) {
+  const rec = failures.get(ip);
+  return rec && Date.now() < rec.reset && rec.count >= 10;
+}
+function recordFailure(ip) {
+  const now = Date.now();
+  let rec = failures.get(ip);
+  if (!rec || now > rec.reset) rec = { count: 0, reset: now + 60000 };
+  rec.count++;
+  failures.set(ip, rec);
 }
 
 app.post("/api/invitations", (req, res) => {
   const ownerSecret = process.env.OWNER_SECRET;
-
   if (!ownerSecret) {
     return res.status(503).json({
-      error: "Server authentication not configured"
+      error: "Server not configured: set the OWNER_SECRET environment variable"
     });
   }
-
+  if (isBlocked(req.ip)) {
+    return res.status(429).json({ error: "Too many attempts. Wait a minute." });
+  }
   const supplied = req.get("x-owner-secret") || "";
-
   if (!secretMatches(supplied, ownerSecret)) {
-    return res.status(403).json({
-      error: "Not authorised"
-    });
+    recordFailure(req.ip);
+    return res.status(403).json({ error: "Wrong secret" });
   }
 
   const id = crypto.randomUUID();
@@ -77,23 +92,17 @@ app.post("/api/invitations", (req, res) => {
   const viewerToken = randomToken();
 
   sessions.set(id, {
-    expires: Date.now() + SESSION_LENGTH,
+    expires: Date.now() + INVITE_LENGTH,
     grandpa: null,
     viewer: null
   });
+  tokens.set(inviteToken, { id, role: "grandpa" });
+  tokens.set(viewerToken, { id, role: "viewer" });
 
-  tokens.set(inviteToken, {
-    id,
-    role: "grandpa"
-  });
-
-  tokens.set(viewerToken, {
-    id,
-    role: "viewer"
-  });
-
-  const base =
-    `${req.get("x-forwarded-proto") || "https"}://${req.get("host")}`;
+  const proto = (req.get("x-forwarded-proto") || req.protocol || "https")
+    .split(",")[0]
+    .trim();
+  const base = `${proto}://${req.get("host")}`;
 
   res.json({
     grandpaUrl: `${base}/?invite=${inviteToken}`,
@@ -103,30 +112,47 @@ app.post("/api/invitations", (req, res) => {
 });
 
 server.on("upgrade", (req, socket, head) => {
-  const url = new URL(req.url, "https://localhost");
-
+  let url;
+  try {
+    url = new URL(req.url, "https://localhost");
+  } catch {
+    socket.destroy();
+    return;
+  }
   if (url.pathname !== "/ws") {
     socket.destroy();
     return;
   }
-
-  wss.handleUpgrade(req, socket, head, ws => {
-    wss.emit("connection", ws, req);
-  });
+  wss.handleUpgrade(req, socket, head, ws => wss.emit("connection", ws, req));
 });
 
+function cleanupSession(id) {
+  sessions.delete(id);
+  for (const [key, value] of tokens) {
+    if (value.id === id) tokens.delete(key);
+  }
+}
+
+function safeSend(ws, obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+}
+
 wss.on("connection", (ws, req) => {
+  ws.isAlive = true;
+  ws.on("pong", () => {
+    ws.isAlive = true;
+  });
+
   const url = new URL(req.url, "https://localhost");
   const token = url.searchParams.get("token");
   const access = tokens.get(token);
 
   if (!access) {
-    ws.close(1008, "Invalid invitation");
+    ws.close(1008, "Invalid or already used invitation");
     return;
   }
 
   const session = sessions.get(access.id);
-
   if (!session || Date.now() > session.expires) {
     tokens.delete(token);
     ws.close(1008, "Invitation expired");
@@ -134,6 +160,7 @@ wss.on("connection", (ws, req) => {
   }
 
   const role = access.role;
+  const otherRole = role === "viewer" ? "grandpa" : "viewer";
 
   if (session[role]) {
     ws.close(1008, "Already connected");
@@ -143,14 +170,15 @@ wss.on("connection", (ws, req) => {
   tokens.delete(token);
   session[role] = ws;
 
-  const otherRole =
-    role === "viewer" ? "grandpa" : "viewer";
+  // Always the first message: tells the client which ICE servers to use
+  safeSend(ws, { type: "config", data: { iceServers } });
 
   if (session[otherRole]) {
-    session.viewer.send(JSON.stringify({ type: "paired" }));
-    session.grandpa.send(JSON.stringify({ type: "paired" }));
+    session.expires = Date.now() + CALL_LENGTH;
+    safeSend(session.viewer, { type: "paired" });
+    safeSend(session.grandpa, { type: "paired" });
   } else {
-    ws.send(JSON.stringify({ type: "waiting" }));
+    safeSend(ws, { type: "waiting" });
   }
 
   ws.on("message", raw => {
@@ -158,22 +186,10 @@ wss.on("connection", (ws, req) => {
       ws.close(1008, "Session expired");
       return;
     }
-
     try {
       const message = JSON.parse(raw.toString());
-
-      if (!["offer", "answer", "candidate"].includes(message.type)) {
-        return;
-      }
-
-      const recipient = session[otherRole];
-
-      if (recipient && recipient.readyState === WebSocket.OPEN) {
-        recipient.send(JSON.stringify({
-          type: message.type,
-          data: message.data
-        }));
-      }
+      if (!["offer", "answer", "candidate"].includes(message.type)) return;
+      safeSend(session[otherRole], { type: message.type, data: message.data });
     } catch {
       ws.close(1008, "Invalid message");
     }
@@ -181,40 +197,46 @@ wss.on("connection", (ws, req) => {
 
   ws.on("close", () => {
     const recipient = session[otherRole];
-
     if (recipient && recipient.readyState === WebSocket.OPEN) {
-      recipient.send(JSON.stringify({ type: "ended" }));
+      safeSend(recipient, { type: "ended" });
       recipient.close();
     }
-
-    sessions.delete(access.id);
-
-    for (const [key, value] of tokens) {
-      if (value.id === access.id) tokens.delete(key);
-    }
+    cleanupSession(access.id);
   });
 });
 
+// Keep connections alive through proxies that drop idle sockets (~60s)
 setInterval(() => {
+  for (const ws of wss.clients) {
+    if (!ws.isAlive) {
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, 25000);
+
+// Expire old sessions
+setInterval(() => {
+  const now = Date.now();
   for (const [id, session] of sessions) {
-    if (Date.now() > session.expires) {
+    if (now > session.expires) {
       for (const ws of [session.viewer, session.grandpa]) {
         if (ws && ws.readyState === WebSocket.OPEN) {
+          safeSend(ws, { type: "expired" });
           ws.close(1008, "Session expired");
         }
       }
-
-      sessions.delete(id);
-
-      for (const [key, value] of tokens) {
-        if (value.id === id) tokens.delete(key);
-      }
+      cleanupSession(id);
     }
+  }
+  for (const [ip, rec] of failures) {
+    if (now > rec.reset) failures.delete(ip);
   }
 }, 30000);
 
 const PORT = process.env.PORT || 3000;
-
 server.listen(PORT, "0.0.0.0", () => {
   console.log("Grandpa Connect running on port " + PORT);
 });

@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,7 +6,6 @@
 <title>Grandpa Connect</title>
 <style>
 * { box-sizing: border-box; }
-
 body {
   margin: 0;
   min-height: 100vh;
@@ -16,9 +14,7 @@ body {
   background: #f5f7f5;
   font-family: Arial, sans-serif;
 }
-
-main { text-align: center; }
-
+main { text-align: center; padding: 20px; max-width: 640px; }
 button {
   background: #159447;
   color: white;
@@ -29,17 +25,11 @@ button {
   font-weight: bold;
   cursor: pointer;
 }
-
-button:disabled { opacity: .6; }
-
-#status {
-  margin-top: 24px;
-  color: #333;
-}
+button:disabled { opacity: .6; cursor: default; }
+#status { margin-top: 24px; color: #333; font-size: 20px; }
 </style>
 </head>
 <body>
-
 <main>
   <button id="accept">ACCEPT</button>
   <p id="status" aria-live="polite"></p>
@@ -47,17 +37,16 @@ button:disabled { opacity: .6; }
 
 <script>
 const button = document.getElementById("accept");
-const status = document.getElementById("status");
+const statusEl = document.getElementById("status");
+const token = new URLSearchParams(location.search).get("invite");
 
-const token = new URLSearchParams(
-  location.search
-).get("invite");
-
-let socket;
-let peer;
-let stream;
+let socket = null;
+let peer = null;
+let stream = null;
+let iceServers = null;
 let paired = false;
 let offerStarted = false;
+let finished = false;
 let pendingCandidates = [];
 
 function send(type, data) {
@@ -66,159 +55,161 @@ function send(type, data) {
   }
 }
 
+function finish(message) {
+  finished = true;
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+  if (peer) {
+    peer.close();
+    peer = null;
+  }
+  if (socket) {
+    const s = socket;
+    socket = null;
+    s.close();
+  }
+  statusEl.textContent = message;
+  button.disabled = true; // invitation is single-use; ask for a new one
+}
+
+function createPeer() {
+  peer = new RTCPeerConnection({ iceServers: iceServers || [] });
+
+  stream.getTracks().forEach(track => peer.addTrack(track, stream));
+
+  peer.onicecandidate = event => {
+    if (event.candidate) send("candidate", event.candidate);
+  };
+
+  peer.onconnectionstatechange = () => {
+    if (!peer) return;
+    if (peer.connectionState === "connected") {
+      statusEl.textContent = "Your screen is being shared.";
+    }
+    if (peer.connectionState === "failed") {
+      finish("Connection failed. Please ask for a new invitation.");
+    }
+  };
+
+  const track = stream.getVideoTracks()[0];
+  if (track) {
+    track.addEventListener("ended", () => {
+      if (!finished) finish("Screen sharing stopped.");
+    });
+  }
+}
+
 async function startOffer() {
-  if (!paired || !stream || offerStarted || !peer) return;
-
+  if (!paired || !peer || offerStarted) return;
   offerStarted = true;
-  status.textContent = "Connecting...";
-
+  statusEl.textContent = "Connecting...";
   const offer = await peer.createOffer();
   await peer.setLocalDescription(offer);
-
   send("offer", peer.localDescription);
 }
 
 async function handleMessage(event) {
   const message = JSON.parse(event.data);
 
+  if (message.type === "config") {
+    iceServers = message.data.iceServers;
+    createPeer();
+    return;
+  }
+
+  if (message.type === "waiting") {
+    statusEl.textContent = "Waiting for your family member to connect...";
+    return;
+  }
+
   if (message.type === "paired") {
     paired = true;
-    status.textContent = "Connected. Preparing screen sharing...";
     await startOffer();
+    return;
   }
 
   if (message.type === "answer" && peer) {
     await peer.setRemoteDescription(message.data);
-
-    for (const candidate of pendingCandidates) {
-      await peer.addIceCandidate(candidate);
-    }
-
+    for (const c of pendingCandidates) await peer.addIceCandidate(c);
     pendingCandidates = [];
-    status.textContent = "Your screen is being shared.";
+    return;
   }
 
   if (message.type === "candidate" && message.data && peer) {
     const candidate = new RTCIceCandidate(message.data);
-
     if (peer.remoteDescription) {
       await peer.addIceCandidate(candidate);
     } else {
       pendingCandidates.push(candidate);
     }
+    return;
   }
 
   if (message.type === "ended" || message.type === "expired") {
-    stopSharing("Session ended.");
+    finish("Session ended.");
   }
 }
 
-function stopSharing(message) {
-  if (stream) {
-    stream.getTracks().forEach(track => track.stop());
-    stream = null;
-  }
-
-  if (peer) {
-    peer.close();
-    peer = null;
-  }
-
-  if (socket) {
-    socket.close();
-    socket = null;
-  }
-
-  status.textContent = message;
-  button.disabled = false;
-  offerStarted = false;
-}
-
-if (!token) {
-  button.disabled = true;
-  status.textContent = "Invalid or expired invitation.";
-} else {
-  const protocol =
-    location.protocol === "https:" ? "wss:" : "ws:";
-
+function openSocket() {
+  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   socket = new WebSocket(
     `${protocol}//${location.host}/ws?token=${encodeURIComponent(token)}`
   );
 
-  history.replaceState(null, "", location.pathname);
-
-  socket.onopen = () => {
-    status.textContent = "";
-  };
-
   socket.onmessage = event => {
-    handleMessage(event).catch(() => {
-      stopSharing("Connection error. Please try again.");
+    handleMessage(event).catch(err => {
+      console.error(err);
+      finish("Connection error. Please ask for a new invitation.");
     });
   };
 
   socket.onerror = () => {
-    status.textContent = "Unable to connect.";
+    if (!finished) statusEl.textContent = "Unable to connect to the server.";
   };
 
-  socket.onclose = () => {
-    if (stream) stopSharing("Connection closed.");
+  socket.onclose = event => {
+    if (finished) return;
+    finish(event.reason
+      ? "Connection closed: " + event.reason
+      : "Connection closed.");
   };
+}
+
+if (!token) {
+  button.disabled = true;
+  statusEl.textContent = "Invalid or expired invitation.";
+} else if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+  // Phones and tablets cannot share their screen from a web page.
+  button.disabled = true;
+  statusEl.textContent =
+    "Screen sharing only works on a computer (Windows, Mac or Chromebook) " +
+    "using Chrome, Edge, Firefox or Safari. It does not work on phones or tablets.";
+} else {
+  // Hide the secret token from the address bar
+  history.replaceState(null, "", location.pathname);
 
   button.addEventListener("click", async () => {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      status.textContent = "Please try again in a moment.";
-      return;
-    }
-
     button.disabled = true;
-    status.textContent = "Please approve screen sharing.";
+    statusEl.textContent = "Please choose a screen to share.";
 
     try {
       stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: false
       });
-
-      peer = new RTCPeerConnection({
-        iceServers: [{
-          urls: "stun:stun.l.google.com:19302"
-        }]
-      });
-
-      stream.getTracks().forEach(track => {
-        peer.addTrack(track, stream);
-      });
-
-      peer.onicecandidate = event => {
-        if (event.candidate) {
-          send("candidate", event.candidate);
-        }
-      };
-
-      peer.onconnectionstatechange = () => {
-        if (peer && peer.connectionState === "connected") {
-          status.textContent = "Sharing your screen.";
-        }
-        if (peer && peer.connectionState === "failed") {
-          stopSharing("Connection failed.");
-        }
-      };
-
-      stream.getTracks()[0].addEventListener("ended", () => {
-        stopSharing("Screen sharing stopped.");
-      });
-
-      status.textContent = "Waiting for your grandson to connect...";
-
-      await startOffer();
-
-    } catch (error) {
-      stopSharing("Screen sharing was not started.");
+    } catch (err) {
+      stream = null;
+      button.disabled = false;
+      statusEl.textContent = "Screen sharing was not started. Press ACCEPT to try again.";
+      return;
     }
+
+    statusEl.textContent = "Connecting...";
+    openSocket();
   });
 }
 </script>
-
 </body>
 </html>

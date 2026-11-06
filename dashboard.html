@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,10 +14,7 @@ body {
   color: white;
   font-family: Arial, sans-serif;
 }
-main {
-  width: min(90%, 480px);
-  text-align: center;
-}
+main { width: min(90%, 480px); text-align: center; padding: 20px 0; }
 button {
   width: 100%;
   padding: 22px;
@@ -30,6 +26,7 @@ button {
   font-weight: bold;
   cursor: pointer;
 }
+button:disabled { opacity: .6; }
 input {
   width: 100%;
   box-sizing: border-box;
@@ -40,6 +37,7 @@ input {
 }
 a { color: #83d8a2; overflow-wrap: anywhere; }
 .result { margin-top: 24px; }
+.error { color: #ff8a8a; }
 </style>
 </head>
 <body>
@@ -48,12 +46,10 @@ a { color: #83d8a2; overflow-wrap: anywhere; }
   <p>Your private support dashboard</p>
 
   <label for="secret">Private owner secret</label>
-  <input id="secret" type="password"
-         autocomplete="off"
+  <input id="secret" type="password" autocomplete="off"
          placeholder="Enter your private secret">
 
   <button id="create">CREATE INVITATION</button>
-
   <div class="result" id="result" aria-live="polite"></div>
 </main>
 
@@ -62,9 +58,17 @@ const secret = document.getElementById("secret");
 const create = document.getElementById("create");
 const result = document.getElementById("result");
 
-create.addEventListener("click", async () => {
+function showError(message) {
+  result.innerHTML = "";
+  const p = document.createElement("p");
+  p.className = "error";
+  p.textContent = message;
+  result.append(p);
+}
+
+async function createInvitation() {
   if (!secret.value) {
-    result.textContent = "Enter your owner secret.";
+    showError("Enter your owner secret.");
     return;
   }
 
@@ -81,10 +85,19 @@ create.addEventListener("click", async () => {
       body: "{}"
     });
 
-    const data = await response.json();
+    let data = null;
+    try {
+      data = await response.json();
+    } catch {
+      /* server returned something that is not JSON */
+    }
 
-    if (!response.ok) {
-      throw new Error(data.error || "Unable to create invitation");
+    if (!response.ok || !data) {
+      throw new Error(
+        (data && data.error) ||
+        "Server error (" + response.status + "). Is the server running " +
+        "and is this page opened from the server's own address?"
+      );
     }
 
     result.innerHTML = "";
@@ -97,29 +110,44 @@ create.addEventListener("click", async () => {
       heading.textContent = label;
 
       const link = document.createElement("a");
-      link.href = url;
       link.textContent = url;
+      if (/^https?:\/\//.test(url)) link.href = url;
 
       const copy = document.createElement("button");
       copy.textContent = "COPY " + label.toUpperCase();
       copy.style.marginTop = "12px";
       copy.addEventListener("click", async () => {
-        await navigator.clipboard.writeText(url);
-        copy.textContent = "COPIED!";
+        try {
+          await navigator.clipboard.writeText(url);
+          copy.textContent = "COPIED!";
+        } catch {
+          // Fallback: select the link text so it can be copied manually
+          const range = document.createRange();
+          range.selectNodeContents(link);
+          const sel = getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          copy.textContent = "PRESS CTRL+C TO COPY";
+        }
       });
 
       result.append(heading, link, copy);
     }
 
     const expiry = document.createElement("p");
-    expiry.textContent = "Invitation expires in 30 minutes.";
+    expiry.textContent =
+      "The invitation must be accepted within 30 minutes. Each link works once.";
     result.append(expiry);
-
   } catch (error) {
-    result.textContent = error.message;
+    showError(error.message);
   } finally {
     create.disabled = false;
   }
+}
+
+create.addEventListener("click", createInvitation);
+secret.addEventListener("keydown", e => {
+  if (e.key === "Enter") createInvitation();
 });
 </script>
 </body>

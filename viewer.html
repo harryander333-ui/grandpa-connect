@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,150 +33,142 @@ button {
 </style>
 </head>
 <body>
-
 <h1>Grandpa Connect ❤️</h1>
 <p id="status">Connecting securely...</p>
-
 <video id="screen" autoplay playsinline muted controls></video>
-<p><button id="stop">END SESSION</button></p>
+<p><button id="stopBtn">END SESSION</button></p>
 
 <script>
-const status = document.getElementById("status");
+const statusEl = document.getElementById("status");
 const video = document.getElementById("screen");
-const stop = document.getElementById("stop");
-
+const stopBtn = document.getElementById("stopBtn");
 const token = new URLSearchParams(location.search).get("token");
 
-let socket;
-let peer;
-let stopped = false;
+let socket = null;
+let peer = null;
+let finished = false;
 let pendingCandidates = [];
 
-function finish(message) {
-  if (stopped) return;
-  stopped = true;
+function send(type, data) {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ type, data }));
+  }
+}
 
+function finish(message) {
+  if (finished) return;
+  finished = true;
   if (peer) peer.close();
   if (socket) socket.close();
-
   video.srcObject = null;
-  status.textContent = message;
+  statusEl.textContent = message;
 }
 
-async function handleOffer(offer) {
-  await peer.setRemoteDescription(offer);
-
-  for (const candidate of pendingCandidates) {
-    await peer.addIceCandidate(candidate);
-  }
-  pendingCandidates = [];
-
-  const answer = await peer.createAnswer();
-  await peer.setLocalDescription(answer);
-
-  socket.send(JSON.stringify({
-    type: "answer",
-    data: peer.localDescription
-  }));
-
-  status.textContent = "Connecting to Grandpa's screen...";
-}
-
-if (!token) {
-  status.textContent = "Invalid or missing invitation.";
-} else {
-  // Remove the invitation token from the visible address.
-  history.replaceState(null, "", location.pathname);
-
-  peer = new RTCPeerConnection({
-    iceServers: [{
-      urls: "stun:stun.l.google.com:19302"
-    }]
-  });
+function createPeer(iceServers) {
+  peer = new RTCPeerConnection({ iceServers: iceServers || [] });
 
   peer.ontrack = event => {
-    video.srcObject = event.streams[0];
-    status.textContent = "Grandpa's screen is connected ❤️";
+    video.srcObject = event.streams[0] || new MediaStream([event.track]);
+    statusEl.textContent = "Grandpa's screen is connected ❤️";
     video.play().catch(() => {});
   };
 
   peer.onicecandidate = event => {
-    if (event.candidate && socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({
-        type: "candidate",
-        data: event.candidate
-      }));
-    }
+    if (event.candidate) send("candidate", event.candidate);
   };
 
   peer.onconnectionstatechange = () => {
+    if (!peer || finished) return;
     if (peer.connectionState === "failed") {
-      status.textContent =
-        "Connection failed. Network relay configuration may be needed.";
+      statusEl.textContent =
+        "Connection failed. A TURN relay server is probably needed (see README).";
     }
     if (peer.connectionState === "disconnected") {
-      status.textContent = "Connection interrupted.";
+      statusEl.textContent = "Connection interrupted...";
+    }
+    if (peer.connectionState === "connected") {
+      statusEl.textContent = "Grandpa's screen is connected ❤️";
     }
   };
+}
+
+async function handleOffer(offer) {
+  await peer.setRemoteDescription(offer);
+  for (const c of pendingCandidates) await peer.addIceCandidate(c);
+  pendingCandidates = [];
+  const answer = await peer.createAnswer();
+  await peer.setLocalDescription(answer);
+  send("answer", peer.localDescription);
+  statusEl.textContent = "Connecting to Grandpa's screen...";
+}
+
+async function handleMessage(event) {
+  const message = JSON.parse(event.data);
+
+  if (message.type === "config") {
+    createPeer(message.data.iceServers);
+    return;
+  }
+  if (message.type === "waiting") {
+    statusEl.textContent = "Waiting for Grandpa to accept...";
+    return;
+  }
+  if (message.type === "paired") {
+    statusEl.textContent = "Grandpa accepted. Waiting for his screen...";
+    return;
+  }
+  if (message.type === "offer" && peer) {
+    await handleOffer(message.data);
+    return;
+  }
+  if (message.type === "candidate" && message.data && peer) {
+    const candidate = new RTCIceCandidate(message.data);
+    if (peer.remoteDescription) {
+      await peer.addIceCandidate(candidate);
+    } else {
+      pendingCandidates.push(candidate);
+    }
+    return;
+  }
+  if (message.type === "ended") {
+    finish("Grandpa has ended the session.");
+    return;
+  }
+  if (message.type === "expired") {
+    finish("This invitation has expired.");
+  }
+}
+
+if (!token) {
+  statusEl.textContent = "Invalid or missing invitation.";
+} else {
+  history.replaceState(null, "", location.pathname);
 
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   socket = new WebSocket(
     `${protocol}//${location.host}/ws?token=${encodeURIComponent(token)}`
   );
 
-  socket.onopen = () => {
-    status.textContent = "Waiting for Grandpa to accept...";
-  };
-
-  socket.onmessage = async event => {
-    try {
-      const message = JSON.parse(event.data);
-
-      if (message.type === "paired") {
-        status.textContent = "Both browsers connected. Waiting for screen sharing...";
-      }
-
-      if (message.type === "offer") {
-        await handleOffer(message.data);
-      }
-
-      if (message.type === "candidate" && message.data) {
-        const candidate = new RTCIceCandidate(message.data);
-
-        if (peer.remoteDescription) {
-          await peer.addIceCandidate(candidate);
-        } else {
-          pendingCandidates.push(candidate);
-        }
-      }
-
-      if (message.type === "ended") {
-        finish("Grandpa has ended the session.");
-      }
-
-      if (message.type === "expired") {
-        finish("This invitation has expired.");
-      }
-    } catch (error) {
-      status.textContent = "Connection error. Please try again.";
-      console.error(error);
-    }
+  socket.onmessage = event => {
+    handleMessage(event).catch(err => {
+      console.error(err);
+      statusEl.textContent = "Connection error. Please create a new invitation.";
+    });
   };
 
   socket.onerror = () => {
-    status.textContent = "Unable to connect to the server.";
+    if (!finished) statusEl.textContent = "Unable to connect to the server.";
   };
 
-  socket.onclose = () => {
-    if (!stopped) {
-      status.textContent = "Connection closed.";
-    }
+  socket.onclose = event => {
+    if (finished) return;
+    statusEl.textContent = event.reason
+      ? "Connection closed: " + event.reason
+      : "Connection closed.";
   };
 }
 
-stop.addEventListener("click", () => {
-  finish("You ended the session.");
-});
+stopBtn.addEventListener("click", () => finish("You ended the session."));
 </script>
 </body>
 </html>
