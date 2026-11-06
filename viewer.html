@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grandpa Connect - Viewer</title>
 <style>
+  * { box-sizing: border-box; }
   body {
     margin: 0;
     padding: 30px;
@@ -15,21 +16,58 @@
     text-align: center;
   }
   h1 { margin-bottom: 25px; }
+  input {
+    padding: 14px;
+    border-radius: 8px;
+    border: 1px solid #777;
+    font-size: 18px;
+    width: 220px;
+  }
+  button {
+    padding: 14px 24px;
+    background: #159447;
+    border: 0;
+    border-radius: 8px;
+    color: white;
+    font-size: 17px;
+    cursor: pointer;
+  }
   video {
     width: 100%;
     max-width: 1100px;
+    margin-top: 25px;
     background: black;
     border-radius: 12px;
   }
-  #status {
-    color: #aaa;
-    margin-top: 20px;
-  }
+  #status { color: #bbb; }
 </style>
 </head>
 <body>
-  <h1>Grandpa Connect ❤️</h1>
-  <video id="screen" autoplay playsinline></video>
-  <p id="status">Waiting for Grandpa to accept...</p>
+<h1>Grandpa Connect ❤️</h1>
+
+<p>Private support session</p>
+
+<input id="code" placeholder="Invitation code" autocomplete="off">
+<button id="connect">CONNECT</button>
+
+<p id="status">Waiting for connection...</p>
+
+<video id="screen" autoplay playsinline controls></video>
+
+<script>
+const code = document.getElementById("code");
+const connect = document.getElementById("connect");
+const status = document.getElementById("status");
+
+connect.addEventListener("click", () => {
+  if (!code.value.trim()) {
+    status.textContent = "Enter your invitation code.";
+    return;
+  }
+
+  status.textContent =
+    "Connection service is not configured yet.";
+});
+</script>
 </body>
 </html>
