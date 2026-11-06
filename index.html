@@ -6,6 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grandpa Connect</title>
 <style>
+* { box-sizing: border-box; }
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -14,7 +16,9 @@ body {
   background: #f5f7f5;
   font-family: Arial, sans-serif;
 }
+
 main { text-align: center; }
+
 button {
   background: #159447;
   color: white;
@@ -25,11 +29,17 @@ button {
   font-weight: bold;
   cursor: pointer;
 }
+
 button:disabled { opacity: .6; }
-#status { margin-top: 24px; }
+
+#status {
+  margin-top: 24px;
+  color: #333;
+}
 </style>
 </head>
 <body>
+
 <main>
   <button id="accept">ACCEPT</button>
   <p id="status" aria-live="polite"></p>
@@ -39,43 +49,176 @@ button:disabled { opacity: .6; }
 const button = document.getElementById("accept");
 const status = document.getElementById("status");
 
-const invite = new URLSearchParams(
+const token = new URLSearchParams(
   location.search
 ).get("invite");
 
-button.addEventListener("click", async () => {
-  if (!invite) {
-    status.textContent = "Invalid invitation.";
-    return;
+let socket;
+let peer;
+let stream;
+let paired = false;
+let offerStarted = false;
+let pendingCandidates = [];
+
+function send(type, data) {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ type, data }));
+  }
+}
+
+async function startOffer() {
+  if (!paired || !stream || offerStarted || !peer) return;
+
+  offerStarted = true;
+  status.textContent = "Connecting...";
+
+  const offer = await peer.createOffer();
+  await peer.setLocalDescription(offer);
+
+  send("offer", peer.localDescription);
+}
+
+async function handleMessage(event) {
+  const message = JSON.parse(event.data);
+
+  if (message.type === "paired") {
+    paired = true;
+    status.textContent = "Connected. Preparing screen sharing...";
+    await startOffer();
   }
 
-  button.disabled = true;
+  if (message.type === "answer" && peer) {
+    await peer.setRemoteDescription(message.data);
 
-  try {
-    const stream =
-      await navigator.mediaDevices.getDisplayMedia({
+    for (const candidate of pendingCandidates) {
+      await peer.addIceCandidate(candidate);
+    }
+
+    pendingCandidates = [];
+    status.textContent = "Your screen is being shared.";
+  }
+
+  if (message.type === "candidate" && message.data && peer) {
+    const candidate = new RTCIceCandidate(message.data);
+
+    if (peer.remoteDescription) {
+      await peer.addIceCandidate(candidate);
+    } else {
+      pendingCandidates.push(candidate);
+    }
+  }
+
+  if (message.type === "ended" || message.type === "expired") {
+    stopSharing("Session ended.");
+  }
+}
+
+function stopSharing(message) {
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
+  }
+
+  if (peer) {
+    peer.close();
+    peer = null;
+  }
+
+  if (socket) {
+    socket.close();
+    socket = null;
+  }
+
+  status.textContent = message;
+  button.disabled = false;
+  offerStarted = false;
+}
+
+if (!token) {
+  button.disabled = true;
+  status.textContent = "Invalid or expired invitation.";
+} else {
+  const protocol =
+    location.protocol === "https:" ? "wss:" : "ws:";
+
+  socket = new WebSocket(
+    `${protocol}//${location.host}/ws?token=${encodeURIComponent(token)}`
+  );
+
+  history.replaceState(null, "", location.pathname);
+
+  socket.onopen = () => {
+    status.textContent = "";
+  };
+
+  socket.onmessage = event => {
+    handleMessage(event).catch(() => {
+      stopSharing("Connection error. Please try again.");
+    });
+  };
+
+  socket.onerror = () => {
+    status.textContent = "Unable to connect.";
+  };
+
+  socket.onclose = () => {
+    if (stream) stopSharing("Connection closed.");
+  };
+
+  button.addEventListener("click", async () => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      status.textContent = "Please try again in a moment.";
+      return;
+    }
+
+    button.disabled = true;
+    status.textContent = "Please approve screen sharing.";
+
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: false
       });
 
-    status.textContent =
-      "Screen sharing is active. You can stop sharing at any time.";
-
-    stream.getTracks().forEach(track => {
-      track.addEventListener("ended", () => {
-        status.textContent = "Screen sharing stopped.";
-        button.disabled = false;
+      peer = new RTCPeerConnection({
+        iceServers: [{
+          urls: "stun:stun.l.google.com:19302"
+        }]
       });
-    });
 
-    // Screen transmission will be added in the next stage.
-    // This page does not send screen data to anyone yet.
+      stream.getTracks().forEach(track => {
+        peer.addTrack(track, stream);
+      });
 
-  } catch (error) {
-    status.textContent = "Screen sharing was not started.";
-    button.disabled = false;
-  }
-});
+      peer.onicecandidate = event => {
+        if (event.candidate) {
+          send("candidate", event.candidate);
+        }
+      };
+
+      peer.onconnectionstatechange = () => {
+        if (peer && peer.connectionState === "connected") {
+          status.textContent = "Sharing your screen.";
+        }
+        if (peer && peer.connectionState === "failed") {
+          stopSharing("Connection failed.");
+        }
+      };
+
+      stream.getTracks()[0].addEventListener("ended", () => {
+        stopSharing("Screen sharing stopped.");
+      });
+
+      status.textContent = "Waiting for your grandson to connect...";
+
+      await startOffer();
+
+    } catch (error) {
+      stopSharing("Screen sharing was not started.");
+    }
+  });
+}
 </script>
+
 </body>
 </html>
