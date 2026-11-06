@@ -3,6 +3,7 @@ const express = require("express");
 const http = require("http");
 const crypto = require("crypto");
 const WebSocket = require("ws");
+const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
@@ -17,15 +18,20 @@ app.use(express.json({ limit: "2kb" }));
 app.use((req, res, next) => {
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Cache-Control", "no-store");
   next();
 });
 
 app.get("/", (req, res) =>
-  res.sendFile(__dirname + "/index.html")
+  res.sendFile(path.join(__dirname, "index.html"))
 );
 
 app.get("/viewer.html", (req, res) =>
-  res.sendFile(__dirname + "/viewer.html")
+  res.sendFile(path.join(__dirname, "viewer.html"))
+);
+
+app.get("/dashboard.html", (req, res) =>
+  res.sendFile(path.join(__dirname, "dashboard.html"))
 );
 
 app.get("/health", (req, res) =>
@@ -35,7 +41,6 @@ app.get("/health", (req, res) =>
 const sessions = new Map();
 const tokens = new Map();
 
-const OWNER_SECRET = process.env.OWNER_SECRET;
 const SESSION_LENGTH = 30 * 60 * 1000;
 
 function randomToken() {
@@ -51,15 +56,17 @@ function secretMatches(a, b) {
 }
 
 app.post("/api/invitations", (req, res) => {
-  if (!OWNER_SECRET) {
+  const ownerSecret = process.env.OWNER_SECRET;
+
+  if (!ownerSecret) {
     return res.status(503).json({
-      error: "Server authentication is not configured"
+      error: "Server authentication not configured"
     });
   }
 
   const supplied = req.get("x-owner-secret") || "";
 
-  if (!secretMatches(supplied, OWNER_SECRET)) {
+  if (!secretMatches(supplied, ownerSecret)) {
     return res.status(403).json({
       error: "Not authorised"
     });
@@ -69,13 +76,11 @@ app.post("/api/invitations", (req, res) => {
   const inviteToken = randomToken();
   const viewerToken = randomToken();
 
-  const session = {
+  sessions.set(id, {
     expires: Date.now() + SESSION_LENGTH,
     grandpa: null,
     viewer: null
-  };
-
-  sessions.set(id, session);
+  });
 
   tokens.set(inviteToken, {
     id,
@@ -87,12 +92,8 @@ app.post("/api/invitations", (req, res) => {
     role: "viewer"
   });
 
-  const protocol =
-    req.get("x-forwarded-proto") || "https";
-
-  const base = `${protocol}://${req.get("host")}`;
-
-  res.setHeader("Cache-Control", "no-store");
+  const base =
+    `${req.get("x-forwarded-proto") || "https"}://${req.get("host")}`;
 
   res.json({
     grandpaUrl: `${base}/?invite=${inviteToken}`,
@@ -139,7 +140,6 @@ wss.on("connection", (ws, req) => {
     return;
   }
 
-  // Each invitation credential can only be used once.
   tokens.delete(token);
   session[role] = ws;
 
@@ -188,6 +188,10 @@ wss.on("connection", (ws, req) => {
     }
 
     sessions.delete(access.id);
+
+    for (const [key, value] of tokens) {
+      if (value.id === access.id) tokens.delete(key);
+    }
   });
 });
 
@@ -196,15 +200,14 @@ setInterval(() => {
     if (Date.now() > session.expires) {
       for (const ws of [session.viewer, session.grandpa]) {
         if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "expired" }));
-          ws.close();
+          ws.close(1008, "Session expired");
         }
       }
 
       sessions.delete(id);
 
-      for (const [token, value] of tokens) {
-        if (value.id === id) tokens.delete(token);
+      for (const [key, value] of tokens) {
+        if (value.id === id) tokens.delete(key);
       }
     }
   }
@@ -213,5 +216,5 @@ setInterval(() => {
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log("Grandpa Connect server started");
+  console.log("Grandpa Connect running on port " + PORT);
 });
