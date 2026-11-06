@@ -26,11 +26,41 @@ button {
   cursor: pointer;
 }
 button:disabled { opacity: .6; cursor: default; }
-#status { margin-top: 24px; color: #333; font-size: 20px; }
+#status { margin-top: 24px; color: #333; font-size: 22px; line-height: 1.4; }
+.howto {
+  display: none;
+  text-align: left;
+  background: white;
+  border: 2px solid #159447;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 28px;
+  font-size: 22px;
+  line-height: 1.5;
+}
+.howto.show { display: block; }
+.howto ol { margin: 10px 0 0; padding-left: 28px; }
+.howto li { margin-bottom: 10px; }
+.howto b { color: #159447; }
+.howto img {
+  display: block;
+  max-width: 100%;
+  border-radius: 10px;
+  margin-top: 14px;
+  border: 1px solid #ccc;
+}
 </style>
 </head>
 <body>
 <main>
+  <div class="howto" id="howto">
+    <p><b>Before you press the button:</b></p>
+    <ol>
+      <li>A box will pop up asking what to share.</li>
+      <li>Click the picture of <b>your whole screen</b> (it may say "Entire Screen" or "Screen 1").</li>
+      <li>Then click the blue <b>Share</b> button.</li>
+    </ol>
+  </div>
   <button id="accept">ACCEPT</button>
   <p id="status" aria-live="polite"></p>
 </main>
@@ -38,6 +68,7 @@ button:disabled { opacity: .6; cursor: default; }
 <script>
 const button = document.getElementById("accept");
 const statusEl = document.getElementById("status");
+const howto = document.getElementById("howto");
 const token = new URLSearchParams(location.search).get("invite");
 
 let socket = null;
@@ -189,15 +220,24 @@ if (!token) {
 } else {
   // Hide the secret token from the address bar
   history.replaceState(null, "", location.pathname);
+  howto.classList.add("show");
 
   button.addEventListener("click", async () => {
     button.disabled = true;
-    statusEl.textContent = "Please choose a screen to share.";
+    statusEl.textContent = "Please choose your whole screen in the box that pops up, then click Share.";
 
     try {
       stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: false
+        video: {
+          // Hints the browser to open on "Entire Screen" first.
+          // Chrome/Edge respect this; other browsers ignore it safely.
+          displaySurface: "monitor"
+        },
+        audio: false,
+        // Don't offer "this tab" as a sharing option — it's never useful here.
+        selfBrowserSurface: "exclude",
+        // Keep sharing the chosen screen even if the user switches tabs/windows.
+        surfaceSwitching: "exclude"
       });
     } catch (err) {
       stream = null;
