@@ -1,235 +1,198 @@
 
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#ffffff">
-<title>Support — Share your screen</title>
+<title>Support | Share Your Screen</title>
+
 <style>
 :root {
-  color-scheme: light;
-  --blue: #175cd3;
-  --navy: #14253c;
-  --text: #192c45;
-  --muted: #607188;
-  --border: #dde5ef;
-  --card: #fff;
+  --blue:#155bd5;
+  --text:#172b46;
+  --muted:#617189;
+  --border:#dfe6ef;
 }
-* { box-sizing: border-box; }
+* { box-sizing:border-box; }
 body {
-  margin: 0;
-  min-height: 100dvh;
-  background: #f3f6fa;
-  color: var(--text);
-  font: 18px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;
+  margin:0;
+  min-height:100dvh;
+  background:#f3f6fb;
+  color:var(--text);
+  font:18px/1.5 system-ui,-apple-system,
+       "Segoe UI",sans-serif;
 }
 header {
-  width: 100%;
-  padding: 17px clamp(18px,5vw,64px);
-  background: #fff;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 15px;
+  background:white;
+  border-bottom:1px solid var(--border);
+  padding:17px 25px;
+  font-size:22px;
+  font-weight:800;
+  letter-spacing:-.5px;
 }
-.brand {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -.6px;
-  color: var(--navy);
-  display: flex;
-  align-items: center;
-  gap: 12px;
+header span {
+  display:inline-grid;
+  place-items:center;
+  width:40px;
+  height:40px;
+  margin-right:10px;
+  background:#e9f0ff;
+  border-radius:12px;
+  color:var(--blue);
 }
-.logo {
-  display: grid;
-  place-items: center;
-  width: 39px;
-  height: 39px;
-  border-radius: 12px;
-  background: #e8efff;
-  color: #1858be;
-  font-size: 21px;
-  font-weight: 900;
-}
-.header-note { font-size: 13px; color: #65768b; }
-.wrap {
-  min-height: calc(100dvh - 78px);
-  display: grid;
-  place-items: center;
-  padding: 34px 16px 45px;
+.wrapper {
+  min-height:calc(100dvh - 76px);
+  display:grid;
+  place-items:center;
+  padding:20px;
 }
 main {
-  width: 100%;
-  max-width: 610px;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 25px;
-  box-shadow: 0 20px 55px rgba(30,55,95,.07);
-  padding: clamp(25px,5vw,50px);
-  text-align: center;
+  width:100%;
+  max-width:560px;
+  background:white;
+  padding:45px 35px;
+  border:1px solid var(--border);
+  border-radius:24px;
+  text-align:center;
+  box-shadow:0 15px 45px rgba(25,55,95,.06);
 }
-.icon-big {
-  display: grid;
-  place-items: center;
-  margin: 0 auto 24px;
-  background: #eaf1ff;
-  color: #1658c9;
-  width: 83px;
-  height: 83px;
-  border-radius: 23px;
-  font-size: 39px;
+.symbol {
+  width:82px;
+  height:82px;
+  margin:0 auto 23px;
+  border-radius:23px;
+  display:grid;
+  place-items:center;
+  background:#e9f0ff;
+  color:var(--blue);
+  font-size:40px;
 }
 h1 {
-  font-size: clamp(30px,6vw,44px);
-  letter-spacing: -1.35px;
-  line-height: 1.15;
-  margin: 0 0 13px;
-  font-weight: 820;
-  color: #14253c;
+  font-size:clamp(30px,5vw,40px);
+  line-height:1.2;
+  margin:0 0 15px;
+  letter-spacing:-1px;
 }
-.lead {
-  font-size: clamp(17px,3vw,20px);
-  color: #5e6e81;
-  line-height: 1.5;
-  margin: 0 0 30px;
+p {
+  color:var(--muted);
+  margin:0 0 25px;
 }
 button {
-  width: 100%;
-  border: none;
-  border-radius: 16px;
-  background: #155bd4;
-  color: #fff;
-  font: 800 clamp(22px,4.3vw,27px)/1.2 system-ui,sans-serif;
-  padding: 26px 14px;
-  cursor: pointer;
-  box-shadow: 0 8px 18px rgba(21,91,212,.15);
+  width:100%;
+  padding:25px 15px;
+  border:0;
+  border-radius:16px;
+  background:var(--blue);
+  color:white;
+  font:800 25px system-ui,sans-serif;
+  cursor:pointer;
 }
-button:hover { background: #104bae; }
+button:hover { background:#114cb2; }
+button:disabled { opacity:.55; cursor:default; }
 button:focus-visible {
-  outline: 4px solid #99b8ff;
-  outline-offset: 4px;
+  outline:4px solid #a2bfff;
+  outline-offset:3px;
 }
-button:disabled { opacity: .55; cursor: default; }
 .stop {
-  margin: 16px 0 0;
-  background: #fff;
-  color: #b42332;
-  border: 2px solid #efb8bd;
-  font-size: 20px;
-  padding: 17px;
-  box-shadow: none;
+  margin-top:15px;
+  padding:18px;
+  color:#aa2435;
+  background:#fff;
+  border:2px solid #ebbec4;
+  font-size:20px;
 }
-.stop:hover { background: #fff3f4; }
-.hidden { display: none!important; }
+.stop:hover { background:#fff5f6; }
+.hidden { display:none!important; }
 .status {
-  border: 1px solid #dce6f2;
-  border-radius: 13px;
-  margin-top: 24px;
-  padding: 15px;
-  background: #f6f9fd;
-  min-height: 56px;
-  font-size: 16px;
-  font-weight: 650;
-  color: #314c71;
+  margin-top:25px;
+  padding:16px;
+  background:#f5f8fd;
+  border:1px solid var(--border);
+  border-radius:13px;
+  font-size:16px;
+  font-weight:600;
+  color:#345276;
 }
-footer {
-  margin: 22px auto 0;
-  max-width: 480px;
-  color: #67758a;
-  font-size: 14px;
-  line-height: 1.5;
+.note {
+  margin-top:22px;
+  font-size:14px;
+  color:#66778e;
 }
-.small {
-  font-size: 12px;
-  color: #8491a2;
-  margin-top: 8px;
-  display: block;
+#quality {
+  font-size:12px;
+  color:#8794a6;
+  margin-top:12px;
 }
 @media(max-width:480px) {
-  header { padding: 12px 18px; }
-  .header-note { display: none; }
-  .wrap {
-    padding: 18px 12px;
-    align-items: start;
-  }
-  main {
-    border-radius: 20px;
-    padding: 33px 23px;
-  }
-  .lead { margin-bottom: 27px; }
+  main { padding:30px 20px; }
+  .wrapper { padding:13px; align-items:start; }
 }
 </style>
 </head>
+
 <body>
+<header><span>✦</span> Support</header>
 
-<header>
-  <div class="brand">
-    <span class="logo" aria-hidden="true">✦</span>
-    Support
-  </div>
-  <span class="header-note">
-    Simple, private screen sharing
-  </span>
-</header>
+<div class="wrapper">
+<main>
+  <div class="symbol">▣</div>
 
-<div class="wrap">
-  <main>
-    <div class="icon-big" aria-hidden="true">▣</div>
+  <h1>Let's get you some help.</h1>
 
-    <h1>Let's get you some help.</h1>
+  <p>
+    Click the button below, choose your screen,
+    then press <strong>Share</strong>.
+  </p>
 
-    <p class="lead" id="guide">
-      Press the button below, choose your screen,
-      then click <strong>Share</strong>
-      in the browser window.
-    </p>
+  <button id="share" type="button">
+    Share my screen
+  </button>
 
-    <button id="share" type="button">
-      Share my screen
-    </button>
+  <button id="stop"
+          type="button"
+          class="stop hidden">
+    Stop sharing
+  </button>
 
-    <button id="stop" type="button" class="stop hidden">
-      Stop sharing
-    </button>
-
-    <p id="status"
+  <div id="status"
+       class="status"
        role="status"
-       aria-live="polite"
-       class="status">
-      Ready when you are.
-    </p>
+       aria-live="polite">
+    Ready when you are.
+  </div>
 
-    <footer>
-      You choose what to share.
-      You can stop at any time.
+  <div class="note">
+    You control what you share.
+    You can stop at any time.
+  </div>
 
-      <span class="small">
-        For Windows or Mac computers using Chrome or Edge.
-      </span>
-
-      <span class="small" id="quality">
-        Low-delay video: automatic
-      </span>
-    </footer>
-  </main>
+  <div id="quality">
+    Video quality: Automatic
+  </div>
+</main>
 </div>
 
 <script>
-const token = new URLSearchParams(location.search).get('invite');
+"use strict";
 
-const share = document.getElementById('share');
-const stop = document.getElementById('stop');
-const statusEl = document.getElementById('status');
-const qualityEl = document.getElementById('quality');
+// SUPPORT SESSION
+const token = new URLSearchParams(
+  location.search
+).get("invite");
+
+const share = document.getElementById("share");
+const stop = document.getElementById("stop");
+const statusEl = document.getElementById("status");
+const qualityEl = document.getElementById("quality");
 
 let stream = null;
 let socket = null;
 let peer = null;
+let sender = null;
 let iceServers = [];
 let finished = false;
+
 let retryTimer = null;
 let retryCount = 0;
 let brokenTimer = null;
@@ -238,35 +201,62 @@ let pending = [];
 let waitingForAnswer = false;
 let lastRestart = 0;
 
+// VIDEO QUALITY
+// Balanced desktop-sharing settings.
+// Prefer readable text and moderate frame rate.
+const BITRATES = [
+  900000,
+  1500000,
+  2400000,
+  3500000,
+  4500000
+];
+
+const FPS = 24;
+let level = 2;
 let qualityTimer = null;
 let qualityBusy = false;
-let videoSender = null;
-let level = 2;
 let healthySamples = 0;
 let lastQualityChange = 0;
 
-const setStatus = t => {
-  statusEl.textContent = t;
-};
+function setStatus(text) {
+  statusEl.textContent = text;
+}
 
 function send(type, data) {
-  if (socket?.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ type, data }));
+  if (
+    socket &&
+    socket.readyState === WebSocket.OPEN
+  ) {
+    socket.send(JSON.stringify({
+      type,
+      data
+    }));
   }
+}
+
+function stopQualityMonitor() {
+  clearInterval(qualityTimer);
+  qualityTimer = null;
 }
 
 function dropPeer() {
   stopQualityMonitor();
   negotiation++;
+
   clearTimeout(brokenTimer);
   brokenTimer = null;
+
   pending = [];
   waitingForAnswer = false;
 
-  const old = peer;
+  const previous = peer;
   peer = null;
+  sender = null;
 
-  if (old) old.close();
+  if (previous) {
+    previous.close();
+  }
 }
 
 function end(message, notify = true) {
@@ -274,9 +264,10 @@ function end(message, notify = true) {
 
   finished = true;
   clearTimeout(retryTimer);
-  dropPeer();
 
-  if (notify) send('end');
+  if (notify) send("end");
+
+  dropPeer();
 
   if (socket) {
     socket.close();
@@ -284,126 +275,65 @@ function end(message, notify = true) {
   }
 
   if (stream) {
-    stream.getTracks().forEach(t => t.stop());
+    stream.getTracks().forEach(
+      track => track.stop()
+    );
     stream = null;
   }
 
   share.disabled = true;
-  stop.classList.add('hidden');
+  stop.classList.add("hidden");
+
   setStatus(message);
 }
 
-function createPeer() {
-  dropPeer();
+// VIDEO ENCODING
+async function applyQuality(targetSender = sender) {
+  if (!targetSender) return;
 
-  const current = new RTCPeerConnection({
-    iceServers
-  });
-
-  peer = current;
-
-  for (const track of stream.getTracks()) {
-    if (track.kind === 'video') {
-      try {
-        track.contentHint = 'motion';
-      } catch(e) {}
-
-      videoSender = current.addTrack(track, stream);
-
-      level = 2;
-      healthySamples = 0;
-      lastQualityChange = 0;
-
-      applyVideoQuality(videoSender).catch(e => {
-        console.warn('Video quality settings unavailable:', e);
-      });
-
-    } else {
-      current.addTrack(track, stream);
-    }
-  }
-
-  current.onicecandidate = e => {
-    if (e.candidate && peer === current) {
-      send('candidate', e.candidate);
-    }
-  };
-
-  current.onconnectionstatechange = () => {
-    if (peer !== current || finished) return;
-
-    if (current.connectionState === 'connected') {
-      clearTimeout(brokenTimer);
-      brokenTimer = null;
-
-      setStatus('✅ Your screen is being shared.');
-      startQualityMonitor(current);
-    }
-
-    if (current.connectionState === 'disconnected') {
-      stopQualityMonitor();
-
-      setStatus('Connection interrupted. Recovering…');
-
-      clearTimeout(brokenTimer);
-
-      brokenTimer = setTimeout(() => {
-        if (
-          peer === current &&
-          current.connectionState === 'disconnected'
-        ) {
-          requestRestart();
-        }
-      }, 5000);
-    }
-
-    if (current.connectionState === 'failed') {
-      stopQualityMonitor();
-      requestRestart();
-    }
-  };
-}
-
-// Low-latency bandwidth levels
-const BITRATE_LEVELS = [
-  350000,
-  550000,
-  850000,
-  1200000
-];
-
-async function applyVideoQuality(sender) {
-  if (!sender || typeof sender.getParameters !== 'function') {
-    return;
-  }
-
-  const params = sender.getParameters();
+  const params = targetSender.getParameters();
 
   if (!params.encodings?.length) {
     params.encodings = [{}];
   }
 
-  params.encodings[0].maxBitrate = BITRATE_LEVELS[level];
-  params.encodings[0].maxFramerate = 20;
+  params.encodings[0].maxBitrate = BITRATES[level];
+  params.encodings[0].maxFramerate = FPS;
+
+  // Preserve desktop details rather than
+  // automatically reducing resolution.
+  params.degradationPreference =
+    "maintain-resolution";
 
   try {
-    params.degradationPreference = 'maintain-framerate';
-  } catch(e) {}
+    await targetSender.setParameters(params);
 
-  await sender.setParameters(params);
+    if (sender === targetSender) {
+      const names = [
+        "Data saver",
+        "Standard",
+        "Balanced",
+        "High",
+        "Maximum"
+      ];
 
-  qualityEl.textContent =
-    'Low-delay video: Auto (' +
-    ['Data saver','Reduced','Balanced','Clearer'][level] +
-    ')';
+      qualityEl.textContent =
+        "Video quality: Auto · " +
+        names[level];
+    }
+  } catch (error) {
+    console.warn(
+      "Encoder settings unavailable:",
+      error
+    );
+
+    qualityEl.textContent =
+      "Video quality: Browser automatic";
+  }
 }
 
-function stopQualityMonitor() {
-  clearInterval(qualityTimer);
-  qualityTimer = null;
-  qualityBusy = false;
-}
-
+// Measure network feedback conservatively.
+// Avoid rapid bitrate fluctuations.
 function startQualityMonitor(current) {
   stopQualityMonitor();
 
@@ -411,14 +341,15 @@ function startQualityMonitor(current) {
     if (
       qualityBusy ||
       peer !== current ||
-      current.connectionState !== 'connected' ||
-      !videoSender
+      current.connectionState !== "connected" ||
+      !sender
     ) return;
 
     qualityBusy = true;
+    const activeSender = sender;
 
     try {
-      const report = await videoSender.getStats();
+      const report = await activeSender.getStats();
 
       if (peer !== current) return;
 
@@ -427,8 +358,9 @@ function startQualityMonitor(current) {
 
       report.forEach(stat => {
         if (
-          stat.type === 'remote-inbound-rtp' &&
-          stat.kind === 'video'
+          stat.type === "remote-inbound-rtp" &&
+          (stat.kind === "video" ||
+           stat.mediaType === "video")
         ) {
           if (Number.isFinite(stat.fractionLost)) {
             loss = stat.fractionLost;
@@ -440,15 +372,17 @@ function startQualityMonitor(current) {
         }
       });
 
-      if (loss === null && rtt === null) return;
+      if (loss === null && rtt === null) {
+        return;
+      }
 
       const congested =
-        (loss !== null && loss > 0.045) ||
-        (rtt !== null && rtt > 0.35);
+        (loss !== null && loss > 0.08) ||
+        (rtt !== null && rtt > 0.65);
 
       const healthy =
         (loss === null || loss < 0.015) &&
-        (rtt === null || rtt < 0.18);
+        (rtt === null || rtt < 0.22);
 
       const now = Date.now();
 
@@ -457,56 +391,156 @@ function startQualityMonitor(current) {
 
         if (
           level > 0 &&
-          now - lastQualityChange > 4500
+          now - lastQualityChange > 12000
         ) {
           level--;
           lastQualityChange = now;
-          await applyVideoQuality(videoSender);
+          await applyQuality(activeSender);
         }
       } else if (healthy) {
         healthySamples++;
 
         if (
           healthySamples >= 4 &&
-          level < BITRATE_LEVELS.length - 1 &&
-          now - lastQualityChange > 18000
+          level < BITRATES.length - 1 &&
+          now - lastQualityChange > 20000
         ) {
           level++;
           healthySamples = 0;
           lastQualityChange = now;
 
-          await applyVideoQuality(videoSender);
+          await applyQuality(activeSender);
         }
       } else {
         healthySamples = 0;
       }
 
-    } catch(e) {
-      console.warn('Quality monitor:', e.message);
+    } catch (error) {
+      console.warn(
+        "Quality statistics:",
+        error
+      );
     } finally {
       qualityBusy = false;
     }
-  }, 3000);
+  }, 5000);
+}
+
+// WEBRTC CONNECTION
+function createPeer() {
+  dropPeer();
+
+  const current = new RTCPeerConnection({
+    iceServers,
+    bundlePolicy: "max-bundle"
+  });
+
+  peer = current;
+
+  for (const track of stream.getTracks()) {
+    if (track.kind === "video") {
+      try {
+        track.contentHint = "detail";
+      } catch (error) {}
+
+      sender = current.addTrack(track, stream);
+
+      level = 2;
+      healthySamples = 0;
+      lastQualityChange = Date.now();
+
+      applyQuality(sender);
+    } else {
+      current.addTrack(track, stream);
+    }
+  }
+
+  current.onicecandidate = event => {
+    if (
+      event.candidate &&
+      peer === current
+    ) {
+      send("candidate", event.candidate);
+    }
+  };
+
+  current.onconnectionstatechange = () => {
+    if (
+      peer !== current ||
+      finished
+    ) return;
+
+    const state = current.connectionState;
+
+    if (state === "connected") {
+      clearTimeout(brokenTimer);
+      brokenTimer = null;
+
+      setStatus(
+        "✅ Your screen is being shared."
+      );
+
+      startQualityMonitor(current);
+    }
+
+    if (state === "disconnected") {
+      stopQualityMonitor();
+
+      setStatus(
+        "Connection interrupted. Reconnecting…"
+      );
+
+      clearTimeout(brokenTimer);
+
+      brokenTimer = setTimeout(() => {
+        if (
+          peer === current &&
+          current.connectionState ===
+          "disconnected"
+        ) {
+          requestRestart();
+        }
+      }, 5000);
+    }
+
+    if (state === "failed") {
+      stopQualityMonitor();
+      requestRestart();
+    }
+  };
 }
 
 function requestRestart() {
-  if (finished || !stream) return;
+  if (
+    finished ||
+    !stream
+  ) return;
 
-  setStatus('Reconnecting automatically…');
+  setStatus(
+    "Reconnecting automatically…"
+  );
 
-  if (Date.now() - lastRestart < 6000) return;
+  if (
+    Date.now() - lastRestart < 6000
+  ) return;
 
   lastRestart = Date.now();
 
-  if (socket?.readyState === WebSocket.OPEN) {
-    send('restart');
+  if (
+    socket?.readyState === WebSocket.OPEN
+  ) {
+    send("restart");
   } else {
     scheduleReconnect();
   }
 }
 
 async function makeOffer() {
-  if (!stream || finished || waitingForAnswer) return;
+  if (
+    !stream ||
+    finished ||
+    waitingForAnswer
+  ) return;
 
   createPeer();
 
@@ -518,84 +552,117 @@ async function makeOffer() {
   try {
     const offer = await current.createOffer();
 
-    if (version !== negotiation) return;
+    if (
+      version !== negotiation
+    ) return;
 
     await current.setLocalDescription(offer);
 
-    if (version !== negotiation) return;
+    if (
+      version !== negotiation
+    ) return;
 
-    send('offer', current.localDescription);
-    setStatus('Connecting…');
+    send(
+      "offer",
+      current.localDescription
+    );
 
-  } catch(e) {
-    console.error(e);
+    setStatus("Connecting…");
+
+  } catch (error) {
+    console.error(error);
+    waitingForAnswer = false;
     requestRestart();
   }
 }
 
-async function processMessage(e) {
-  const m = JSON.parse(e.data);
+// SIGNALING
+async function processMessage(event) {
+  const message = JSON.parse(event.data);
 
   if (finished) return;
 
-  if (m.type === 'config') {
-    iceServers = m.data?.iceServers || [];
+  if (message.type === "config") {
+    iceServers =
+      message.data?.iceServers || [];
+
     return;
   }
 
-  if (m.type === 'waiting') {
-    dropPeer();
-
-    setStatus('Waiting for your family member…');
-    return;
-  }
-
-  if (m.type === 'peer-left') {
+  if (message.type === "waiting") {
     dropPeer();
 
     setStatus(
-      'Other device disconnected. Waiting for it to reconnect…'
+      "Waiting for your support person…"
     );
     return;
   }
 
-  if (m.type === 'paired') {
+  if (message.type === "peer-left") {
+    dropPeer();
+
+    setStatus(
+      "The viewer disconnected. Waiting for reconnection…"
+    );
+    return;
+  }
+
+  if (message.type === "paired") {
     await makeOffer();
     return;
   }
 
-  if (m.type === 'answer' && peer) {
+  if (
+    message.type === "answer" &&
+    peer
+  ) {
     const current = peer;
 
-    if (current.signalingState !== 'have-local-offer') {
-      return;
-    }
+    if (
+      current.signalingState !==
+      "have-local-offer"
+    ) return;
 
-    await current.setRemoteDescription(m.data);
+    await current.setRemoteDescription(
+      message.data
+    );
 
-    if (peer !== current) return;
+    if (
+      peer !== current
+    ) return;
 
-    for (const c of pending) {
+    for (const candidate of pending) {
       try {
-        await current.addIceCandidate(c);
-      } catch(e) {
-        console.warn('ICE candidate skipped', e);
+        await current.addIceCandidate(
+          candidate
+        );
+      } catch (error) {
+        console.warn(error);
       }
     }
 
     pending = [];
     waitingForAnswer = false;
+
     return;
   }
 
-  if (m.type === 'candidate' && m.data && peer) {
-    const candidate = new RTCIceCandidate(m.data);
+  if (
+    message.type === "candidate" &&
+    message.data &&
+    peer
+  ) {
+    const candidate = new RTCIceCandidate(
+      message.data
+    );
 
     if (peer.remoteDescription) {
       try {
-        await peer.addIceCandidate(candidate);
-      } catch(e) {
-        console.warn('ICE candidate skipped', e);
+        await peer.addIceCandidate(
+          candidate
+        );
+      } catch (error) {
+        console.warn(error);
       }
     } else {
       pending.push(candidate);
@@ -605,18 +672,26 @@ async function processMessage(e) {
   }
 
   if (
-    m.type === 'ended' ||
-    m.type === 'expired'
+    message.type === "ended" ||
+    message.type === "expired"
   ) {
-    end('Session ended. Ask for a new invitation.', false);
+    end(
+      "Session ended. Please request a new invitation.",
+      false
+    );
   }
 }
 
+// AUTOMATIC RECONNECTION
 function scheduleReconnect() {
-  if (finished || !stream || retryTimer) return;
+  if (
+    finished ||
+    !stream ||
+    retryTimer
+  ) return;
 
   setStatus(
-    'Internet interrupted. Trying to reconnect…'
+    "Internet interrupted. Reconnecting…"
   );
 
   const delay = Math.min(
@@ -631,11 +706,19 @@ function scheduleReconnect() {
 }
 
 function connectSocket() {
-  if (finished || !stream) return;
+  if (
+    finished ||
+    !stream
+  ) return;
+
+  const protocol =
+    location.protocol === "https:"
+      ? "wss:"
+      : "ws:";
 
   const url =
-    `${location.protocol === 'https:' ? 'wss:' : 'ws:'}` +
-    `//${location.host}/ws?token=${encodeURIComponent(token)}`;
+    `${protocol}//${location.host}/ws?token=` +
+    encodeURIComponent(token);
 
   const ws = new WebSocket(url);
   socket = ws;
@@ -645,26 +728,29 @@ function connectSocket() {
     retryCount = 0;
   };
 
-  ws.onmessage = e => {
+  ws.onmessage = event => {
     if (socket !== ws) return;
 
-    processMessage(e).catch(err => {
-      console.error(err);
+    processMessage(event).catch(error => {
+      console.error(error);
       requestRestart();
     });
   };
 
   ws.onerror = () => {};
 
-  ws.onclose = e => {
-    if (socket !== ws || finished) return;
+  ws.onclose = event => {
+    if (
+      socket !== ws ||
+      finished
+    ) return;
 
     socket = null;
     dropPeer();
 
-    if (e.code === 1008) {
+    if (event.code === 1008) {
       end(
-        'This session has expired or is already open. Ask for a new invitation.',
+        "Session expired. Please request a new invitation.",
         false
       );
       return;
@@ -674,79 +760,112 @@ function connectSocket() {
   };
 }
 
+// SHARE SCREEN
 if (!token) {
   share.disabled = true;
-
   setStatus(
-    'Please open the invitation link sent to you.'
+    "Please open your personal invitation link."
   );
-
-} else if (!navigator.mediaDevices?.getDisplayMedia) {
+}
+else if (
+  !navigator.mediaDevices?.getDisplayMedia
+) {
   share.disabled = true;
 
   setStatus(
-    'Open this link on a Windows or Mac computer in Chrome or Edge.'
+    "Please open this link on a Windows or Mac computer using Chrome or Edge."
+  );
+}
+else {
+  // Hide private invitation token from
+  // the address bar after loading it.
+  history.replaceState(
+    null,
+    "",
+    location.pathname
   );
 
-} else {
-  history.replaceState(null, '', location.pathname);
-
-  share.addEventListener('click', async () => {
-    share.disabled = true;
-
-    setStatus(
-      'Choose the screen to share in the browser popup…'
-    );
-
-    try {
-      stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          displaySurface: 'monitor',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: {
-            ideal: 20,
-            max: 24
-          }
-        },
-        audio: false,
-        selfBrowserSurface: 'exclude'
-      });
-
-    } catch(e) {
-      share.disabled = false;
+  share.addEventListener(
+    "click",
+    async () => {
+      share.disabled = true;
 
       setStatus(
-        'Screen sharing was not started. Press the button to try again.'
+        "Choose your screen in the browser popup…"
       );
-      return;
-    }
 
-    stream.getVideoTracks()[0]?.addEventListener(
-      'ended',
-      () => end('You stopped sharing.')
-    );
+      try {
+        stream =
+          await navigator.mediaDevices.getDisplayMedia({
+            video: {
+              displaySurface: "monitor",
 
-    share.classList.add('hidden');
-    stop.classList.remove('hidden');
+              width: {
+                ideal: 1920
+              },
 
-    connectSocket();
-  });
+              height: {
+                ideal: 1080
+              },
 
-  stop.addEventListener(
-    'click',
-    () => end('You stopped sharing.')
-  );
+              frameRate: {
+                ideal: 24,
+                max: 30
+              }
+            },
 
-  window.addEventListener('online', () => {
-    if (!socket && !finished && stream) {
-      clearTimeout(retryTimer);
-      retryTimer = null;
+            audio: false,
+            selfBrowserSurface: "exclude"
+          });
+
+      } catch (error) {
+        share.disabled = false;
+
+        setStatus(
+          "Sharing wasn't started. Click the button to try again."
+        );
+
+        return;
+      }
+
+      const videoTrack =
+        stream.getVideoTracks()[0];
+
+      if (videoTrack) {
+        videoTrack.addEventListener(
+          "ended",
+          () => end("You stopped sharing.")
+        );
+      }
+
+      share.classList.add("hidden");
+      stop.classList.remove("hidden");
+
       connectSocket();
     }
-  });
+  );
+
+  stop.addEventListener(
+    "click",
+    () => end("You stopped sharing.")
+  );
+
+  window.addEventListener(
+    "online",
+    () => {
+      if (
+        !socket &&
+        !finished &&
+        stream
+      ) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+
+        connectSocket();
+      }
+    }
+  );
 }
 </script>
-
 </body>
 </html>
