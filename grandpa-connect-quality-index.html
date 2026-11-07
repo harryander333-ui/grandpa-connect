@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Grandpa Connect — Share Screen</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100dvh;background:#101e31;color:#fff;font:18px system-ui,Arial,sans-serif;display:grid;place-items:center;padding:22px}main{text-align:center;max-width:500px;width:100%}h1{font-size:clamp(28px,5vw,42px);margin:0 0 15px}p{line-height:1.55;color:#c6d5e6}button{border:0;border-radius:18px;background:#eab46c;color:#18120b;font-weight:800;font-size:clamp(22px,5vw,30px);padding:27px 18px;width:100%;cursor:pointer}button:disabled{opacity:.6;cursor:default}.stop{background:#342b36;color:#ffc4c4;border:1px solid #84525b;font-size:17px;padding:17px;margin-top:22px}.hidden{display:none}#status{min-height:3em;margin-top:22px}small{color:#b5c2d6;display:block;margin-top:15px}
+</style></head><body><main>
+<h1>❤️ Grandpa Connect</h1>
+<p id="guide">Press the big button, choose your screen and click Share.</p>
+<button id="share">Share my screen</button>
+<button id="stop" class="stop hidden">Stop sharing</button>
+<p id="status" role="status" aria-live="polite">Ready when you are.</p>
+<small>Screen sharing stays visible. You can stop it at any time.</small><small id="quality" aria-live="off">Video quality: automatic</small>
+</main><script>
+const token=new URLSearchParams(location.search).get('invite');
+const share=document.getElementById('share'),stop=document.getElementById('stop'),statusEl=document.getElementById('status'),qualityEl=document.getElementById('quality');
+let stream=null,socket=null,peer=null,iceServers=[],finished=false,retryTimer=null,retryCount=0,brokenTimer=null,negotiation=0,pending=[],waitingForAnswer=false,lastRestart=0;
+let qualityTimer=null,qualityBusy=false,videoSender=null,level=2,healthySamples=0,lastQualityChange=0;
+const setStatus=t=>{statusEl.textContent=t;};
+function send(type,data){if(socket?.readyState===WebSocket.OPEN) socket.send(JSON.stringify({type,data}));}
+function dropPeer(){stopQualityMonitor();negotiation++;clearTimeout(brokenTimer);brokenTimer=null;pending=[];waitingForAnswer=false;const old=peer;peer=null;if(old) old.close();}
+function end(message,notify=true){if(finished)return;finished=true;clearTimeout(retryTimer);dropPeer();if(notify)send('end');if(socket){socket.close();socket=null;}if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}share.disabled=true;stop.classList.add('hidden');setStatus(message);}
+function createPeer(){
+ dropPeer();const current=new RTCPeerConnection({iceServers});peer=current;
+ for(const track of stream.getTracks()){
+   if(track.kind==='video'){
+     try{track.contentHint='detail';}catch(e){}
+     videoSender=current.addTrack(track,stream);
+     level=2;healthySamples=0;lastQualityChange=0;
+     applyVideoQuality(videoSender).catch(e=>console.warn('Video quality settings unavailable:',e));
+   }else current.addTrack(track,stream);
+ }
+ current.onicecandidate=e=>{if(e.candidate&&peer===current)send('candidate',e.candidate);};
+ current.onconnectionstatechange=()=>{
+   if(peer!==current||finished)return;
+   if(current.connectionState==='connected'){clearTimeout(brokenTimer);brokenTimer=null;setStatus('✅ Your screen is being shared.');startQualityMonitor(current);}
+   if(current.connectionState==='disconnected'){stopQualityMonitor();setStatus('Connection interrupted. Recovering…');clearTimeout(brokenTimer);brokenTimer=setTimeout(()=>{if(peer===current&&current.connectionState==='disconnected')requestRestart();},5000);}
+   if(current.connectionState==='failed'){stopQualityMonitor();requestRestart();}
+ };
+}
+// Prefer legible text; reduce bitrate before sacrificing resolution.
+const BITRATE_LEVELS=[500000,850000,1400000,2200000];
+async function applyVideoQuality(sender){
+ if(!sender || typeof sender.getParameters!=='function')return;
+ const params=sender.getParameters();
+ if(!params.encodings?.length)params.encodings=[{}];
+ params.encodings[0].maxBitrate=BITRATE_LEVELS[level];
+ params.encodings[0].maxFramerate=15;
+ try{params.degradationPreference='maintain-resolution';}catch(e){}
+ await sender.setParameters(params);
+ qualityEl.textContent='Video quality: Auto ('+['Low','Medium','High','Best'][level]+')';
+}
+function stopQualityMonitor(){
+ clearInterval(qualityTimer);qualityTimer=null;qualityBusy=false;
+}
+function startQualityMonitor(current){
+ stopQualityMonitor();
+ qualityTimer=setInterval(async()=>{
+   if(qualityBusy || peer!==current || current.connectionState!=='connected' || !videoSender)return;
+   qualityBusy=true;
+   try{
+     const report=await videoSender.getStats();
+     if(peer!==current)return;
+     let loss=null,rtt=null;
+     report.forEach(stat=>{
+       if(stat.type==='remote-inbound-rtp'&&stat.kind==='video'){
+         if(Number.isFinite(stat.fractionLost))loss=stat.fractionLost;
+         if(Number.isFinite(stat.roundTripTime))rtt=stat.roundTripTime;
+       }
+     });
+     // Only adjust based on actual feedback; never guess a bad network from missing stats.
+     if(loss===null&&rtt===null)return;
+     const congested=(loss!==null&&loss>0.06)||(rtt!==null&&rtt>0.5);
+     const healthy=(loss===null||loss<0.02)&&(rtt===null||rtt<0.25);
+     const now=Date.now();
+     if(congested){
+       healthySamples=0;
+       if(level>0 && now-lastQualityChange>7000){level--;lastQualityChange=now;await applyVideoQuality(videoSender);}
+     }else if(healthy){
+       healthySamples++;
+       if(healthySamples>=4 && level<BITRATE_LEVELS.length-1 && now-lastQualityChange>14000){
+         level++;healthySamples=0;lastQualityChange=now;await applyVideoQuality(videoSender);
+       }
+     }else healthySamples=0;
+   }catch(e){console.warn('Quality monitor:',e.message);}
+   finally{qualityBusy=false;}
+ },5000);
+}
+function requestRestart(){if(finished||!stream)return;setStatus('Reconnecting automatically…');if(Date.now()-lastRestart<6000)return;lastRestart=Date.now();if(socket?.readyState===WebSocket.OPEN)send('restart');else scheduleReconnect();}
+async function makeOffer(){
+ if(!stream||finished||waitingForAnswer)return;
+ createPeer();const current=peer,version=negotiation;waitingForAnswer=true;
+ try{const offer=await current.createOffer();if(version!==negotiation)return;await current.setLocalDescription(offer);if(version!==negotiation)return;send('offer',current.localDescription);setStatus('Connecting…');}
+ catch(e){console.error(e);requestRestart();}
+}
+async function processMessage(e){
+ const m=JSON.parse(e.data);if(finished)return;
+ if(m.type==='config'){iceServers=m.data?.iceServers||[];return;}
+ if(m.type==='waiting'){dropPeer();setStatus('Waiting for your family member…');return;}
+ if(m.type==='peer-left'){dropPeer();setStatus('Other device disconnected. Waiting for it to reconnect…');return;}
+ if(m.type==='paired'){await makeOffer();return;}
+ if(m.type==='answer'&&peer){
+   const current=peer;if(current.signalingState!=='have-local-offer')return;
+   await current.setRemoteDescription(m.data);if(peer!==current)return;
+   for(const c of pending){try{await current.addIceCandidate(c);}catch(e){console.warn('ICE candidate skipped',e);}}
+   pending=[];waitingForAnswer=false;return;
+ }
+ if(m.type==='candidate'&&m.data&&peer){
+   const candidate=new RTCIceCandidate(m.data);
+   if(peer.remoteDescription){try{await peer.addIceCandidate(candidate);}catch(e){console.warn('ICE candidate skipped',e);}}
+   else pending.push(candidate);
+   return;
+ }
+ if(m.type==='ended'||m.type==='expired')end('Session ended. Ask for a new invitation.',false);
+}
+function scheduleReconnect(){
+ if(finished||!stream||retryTimer)return;
+ setStatus('Internet interrupted. Trying to reconnect…');
+ const delay=Math.min(1000*2**Math.min(retryCount++,4),15000);
+ retryTimer=setTimeout(()=>{retryTimer=null;connectSocket();},delay);
+}
+function connectSocket(){
+ if(finished||!stream)return;
+ const url=`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/ws?token=${encodeURIComponent(token)}`;
+ const ws=new WebSocket(url);socket=ws;
+ ws.onopen=()=>{if(socket!==ws)return;retryCount=0;};
+ ws.onmessage=e=>{if(socket!==ws)return;processMessage(e).catch(err=>{console.error(err);requestRestart();});};
+ ws.onerror=()=>{};
+ ws.onclose=e=>{
+   if(socket!==ws||finished)return;
+   socket=null;dropPeer();
+   if(e.code===1008){end('This session has expired or is already open. Ask for a new invitation.',false);return;}
+   scheduleReconnect();
+ };
+}
+if(!token){share.disabled=true;setStatus('Please open the invitation link sent to you.');}
+else if(!navigator.mediaDevices?.getDisplayMedia){share.disabled=true;setStatus('Open this link on a Windows or Mac computer in Chrome or Edge.');}
+else{
+ history.replaceState(null,'',location.pathname);
+ share.addEventListener('click',async()=>{
+   share.disabled=true;setStatus('Choose the screen to share in the browser popup…');
+   try{stream=await navigator.mediaDevices.getDisplayMedia({video:{displaySurface:'monitor',frameRate:{ideal:15,max:20}},audio:false,selfBrowserSurface:'exclude'});}
+   catch(e){share.disabled=false;setStatus('Screen sharing was not started. Press the button to try again.');return;}
+   stream.getVideoTracks()[0]?.addEventListener('ended',()=>end('You stopped sharing.'));
+   share.classList.add('hidden');stop.classList.remove('hidden');connectSocket();
+ });
+ stop.addEventListener('click',()=>end('You stopped sharing.'));
+ window.addEventListener('online',()=>{if(!socket&&!finished&&stream){clearTimeout(retryTimer);retryTimer=null;connectSocket();}});
+}
+</script></body></html>
