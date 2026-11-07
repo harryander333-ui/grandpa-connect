@@ -1,30 +1,194 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Grandpa Connect — Viewer</title><style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100dvh;background:#101e31;color:#f8fafc;font:16px system-ui,Arial,sans-serif}header{text-align:center;padding:18px 12px 5px}header h1{font-size:21px;margin:0}main{max-width:1350px;margin:auto;padding:12px;text-align:center}#status{color:#c1d4e7;min-height:2.5em;margin:10px 0}video{width:100%;max-height:77dvh;object-fit:contain;background:#000;border-radius:14px}nav{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:14px}button{border:1px solid #52627b;background:#253750;color:#fff;border-radius:12px;padding:14px 20px;font-size:16px;min-height:49px;cursor:pointer}#stop{color:#ffbfc6;border-color:#74444b}small{display:block;color:#9cacc3;margin-top:12px}@media(max-width:600px){main{padding:4px}header{padding:10px}video{max-height:80dvh;border-radius:5px}button{flex:1}}
-</style></head><body><header><h1>❤️ Grandpa Connect</h1></header><main>
-<p id="status" role="status" aria-live="polite">Connecting securely…</p>
-<video id="screen" autoplay playsinline muted></video>
-<nav><button id="fullscreen">⛶ Fullscreen</button><button id="stop">End session</button></nav>
-<small>Screen viewing only. Grandpa can stop sharing at any time.</small>
-</main><script>
-const statusEl=document.getElementById('status'),video=document.getElementById('screen');
-const token=new URLSearchParams(location.search).get('token');
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101e31">
+  <title>Grandpa Connect — Mobile Viewer</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+    * { box-sizing: border-box; }
+    body { background:#101e31; color:#fff; margin:0; min-height:100dvh; overflow-x:hidden; }
+    .app { min-height:100dvh; display:flex; flex-direction:column; }
+    header { padding:10px 12px 3px; text-align:center; }
+    h1 { margin:0; font-size:clamp(17px,3.6vw,22px); }
+    #status { font-size:13px; margin:7px 0 10px; color:#c7d8ea; min-height:1.3em; }
+    .workspace { flex:1; min-height:0; padding:0 10px; display:flex; flex-direction:column; }
+    #viewport { position:relative; width:100%; height:min(72dvh,850px); min-height:260px; overflow:hidden; border:1px solid #3d5068; border-radius:14px; background:#000; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; }
+    #viewport.dragging { cursor:grabbing; }
+    #screen { width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; transform-origin:center center; will-change:transform; }
+    #hint { position:absolute; left:12px; right:12px; bottom:12px; text-align:center; padding:6px; font-size:12px; color:#d6e4f2; background:#101e31a8; border-radius:8px; pointer-events:none; }
+    .toolbar { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin:12px auto 8px; width:100%; max-width:850px; }
+    button { appearance:none; border:1px solid #61758c; background:#283c56; color:#fff; font-size:15px; font-weight:650; border-radius:12px; min-height:50px; padding:10px 14px; cursor:pointer; touch-action:manipulation; }
+    button:focus-visible { outline:3px solid #f3bb70; outline-offset:2px; }
+    button:active { background:#415b78; }
+    .toolbar button { flex:1 1 95px; }
+    #stop { border-color:#a1636d; background:#432b35; color:#ffd7dd; }
+    .note { text-align:center; font-size:12px; line-height:1.4; color:#a8bdd3; padding:2px 10px calc(12px + env(safe-area-inset-bottom)); }
+    #viewport:fullscreen, #viewport:-webkit-full-screen { width:100vw; height:100dvh; border:0; border-radius:0; }
+    #viewport:fullscreen #hint { bottom:calc(12px + env(safe-area-inset-bottom)); }
+    @media (max-width: 650px) {
+      header { padding:8px 10px 2px; }
+      .workspace { padding:0 5px; }
+      #viewport { height:calc(100dvh - 188px - env(safe-area-inset-bottom)); min-height:220px; border-radius:9px; }
+      .toolbar { margin:8px auto; gap:6px; }
+      .toolbar button { flex-basis:30%; min-height:49px; font-size:14px; padding:8px; }
+      .note { font-size:11px; }
+    }
+    @media (orientation:landscape) and (max-height:550px) {
+      header { display:none; }
+      #viewport { height:calc(100dvh - 78px - env(safe-area-inset-bottom)); }
+      .toolbar { margin:4px auto; }
+      .toolbar button { min-height:40px; }
+      .note { display:none; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>❤️ Grandpa Connect</h1>
+    <p id="status" role="status" aria-live="polite">Connecting securely…</p>
+  </header>
+  <main class="workspace">
+    <div id="viewport" aria-label="Shared screen. Pinch or double-tap to zoom, and drag to move when zoomed in.">
+      <video id="screen" autoplay playsinline muted></video>
+      <div id="hint">Pinch to zoom • Drag to move • Double-tap to zoom</div>
+    </div>
+    <nav class="toolbar" aria-label="Viewing controls">
+      <button type="button" id="zoomOut" aria-label="Zoom out">− Zoom</button>
+      <button type="button" id="reset" aria-label="Fit full screen">↺ Fit</button>
+      <button type="button" id="zoomIn" aria-label="Zoom in">+ Zoom</button>
+      <button type="button" id="fullscreen">⛶ Fullscreen</button>
+      <button type="button" id="stop">End session</button>
+    </nav>
+    <div class="note">Viewing only — tapping does not control Grandpa’s PC. He can stop sharing at any time.</div>
+  </main>
+</div>
+<script>
+'use strict';
+const statusEl = document.getElementById('status');
+const video = document.getElementById('screen');
+const viewport = document.getElementById('viewport');
+const hint = document.getElementById('hint');
+const tokenFromUrl = new URLSearchParams(location.search).get('token');
+// Keep this invitation in this tab to support a page refresh, not in a permanent cookie.
+if (tokenFromUrl) sessionStorage.setItem('grandpaViewerToken', tokenFromUrl);
+const token = tokenFromUrl || sessionStorage.getItem('grandpaViewerToken');
+if (tokenFromUrl) history.replaceState(null, '', location.pathname);
+
+// Phone zoom/pan (viewer only; no control commands are sent).
+let scale=1, moveX=0, moveY=0;
+const fingers=new Map();
+let gesture=null, lastTap=0;
+function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
+function renderView(){
+  scale=clamp(scale,1,5);
+  const maxX=(viewport.clientWidth*(scale-1))/2;
+  const maxY=(viewport.clientHeight*(scale-1))/2;
+  moveX=clamp(moveX,-maxX,maxX);
+  moveY=clamp(moveY,-maxY,maxY);
+  video.style.transform=`translate(${moveX}px,${moveY}px) scale(${scale})`;
+  hint.hidden=scale>1.05;
+}
+function changeZoom(next){scale=next;if(scale<=1.001){scale=1;moveX=0;moveY=0;}renderView();}
+document.getElementById('zoomIn').addEventListener('click',()=>changeZoom(scale*1.5));
+document.getElementById('zoomOut').addEventListener('click',()=>changeZoom(scale/1.5));
+document.getElementById('reset').addEventListener('click',()=>changeZoom(1));
+function midpoint(a,b){return {x:(a.x+b.x)/2,y:(a.y+b.y)/2,dist:Math.hypot(a.x-b.x,a.y-b.y)};}
+function startGesture(){
+ const list=[...fingers.values()];
+ if(list.length===1)gesture={kind:'pan',point:list[0],x:moveX,y:moveY};
+ else if(list.length>=2){const m=midpoint(list[0],list[1]);gesture={kind:'pinch',m,scale,x:moveX,y:moveY};}
+ else gesture=null;
+}
+viewport.addEventListener('pointerdown',e=>{
+ if(e.pointerType==='mouse'&&e.button!==0)return;
+ e.preventDefault();viewport.setPointerCapture(e.pointerId);
+ fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});startGesture();
+ viewport.classList.add('dragging');
+});
+viewport.addEventListener('pointermove',e=>{
+ if(!fingers.has(e.pointerId)||!gesture)return;
+ e.preventDefault();fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ const list=[...fingers.values()];
+ if(list.length===1&&gesture.kind==='pan'){
+  moveX=gesture.x+list[0].x-gesture.point.x;
+  moveY=gesture.y+list[0].y-gesture.point.y;
+ } else if(list.length>=2&&gesture.kind==='pinch'){
+  const m=midpoint(list[0],list[1]);
+  const next=clamp(gesture.scale*(m.dist/Math.max(1,gesture.m.dist)),1,5);
+  const rect=viewport.getBoundingClientRect();
+  const anchorX=gesture.m.x-(rect.left+rect.width/2);
+  const anchorY=gesture.m.y-(rect.top+rect.height/2);
+  moveX=gesture.x+(m.x-gesture.m.x)+anchorX*(1-next/gesture.scale)+(gesture.x*(next/gesture.scale-1));
+  moveY=gesture.y+(m.y-gesture.m.y)+anchorY*(1-next/gesture.scale)+(gesture.y*(next/gesture.scale-1));
+  scale=next;
+ }
+ renderView();
+});
+function pointerEnd(e){
+ if(!fingers.has(e.pointerId))return;
+ fingers.delete(e.pointerId);startGesture();
+ if(!fingers.size)viewport.classList.remove('dragging');
+}
+viewport.addEventListener('pointerup',pointerEnd);
+viewport.addEventListener('pointercancel',pointerEnd);
+viewport.addEventListener('lostpointercapture',pointerEnd);
+viewport.addEventListener('pointerup',e=>{
+ if(e.pointerType!=='touch'||fingers.size)return;
+ const now=Date.now();
+ if(now-lastTap<330){changeZoom(scale>1.05?1:2.5);lastTap=0;}
+ else lastTap=now;
+});
+viewport.addEventListener('dblclick',e=>{e.preventDefault();changeZoom(scale>1.05?1:2.5);});
+window.addEventListener('resize',renderView);
+
+// Existing WebRTC / TURN / automatic reconnection flow.
 let socket=null,peer=null,iceServers=[],finished=false,retryTimer=null,retryCount=0,brokenTimer=null,pending=[],negotiation=0,lastRestart=0;
 function setStatus(t){statusEl.textContent=t;}
 function send(type,data){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify({type,data}));}
-function dropPeer(){negotiation++;clearTimeout(brokenTimer);brokenTimer=null;pending=[];const old=peer;peer=null;if(old)old.close();video.srcObject=null;}
-function end(message,notify=true){if(finished)return;finished=true;clearTimeout(retryTimer);dropPeer();if(notify)send('end');if(socket){socket.close();socket=null;}setStatus(message);}
-function requestRestart(){if(finished)return;setStatus('Connection interrupted. Reconnecting…');if(Date.now()-lastRestart<6000)return;lastRestart=Date.now();if(socket?.readyState===WebSocket.OPEN)send('restart');else scheduleReconnect();}
+function dropPeer(){
+ negotiation++;clearTimeout(brokenTimer);brokenTimer=null;pending=[];
+ const old=peer;peer=null;if(old)old.close();video.srcObject=null;
+}
+function end(message,notify=true){
+ if(finished)return;finished=true;clearTimeout(retryTimer);dropPeer();
+ if(notify)send('end');
+ if(socket){socket.close();socket=null;}
+ sessionStorage.removeItem('grandpaViewerToken');
+ setStatus(message);
+}
+function requestRestart(){
+ if(finished)return;
+ setStatus('Connection interrupted. Reconnecting…');
+ if(Date.now()-lastRestart<6000)return;
+ lastRestart=Date.now();
+ if(socket?.readyState===WebSocket.OPEN)send('restart');else scheduleReconnect();
+}
 function createPeer(){
  dropPeer();const current=new RTCPeerConnection({iceServers});peer=current;
- current.ontrack=e=>{if(peer!==current)return;video.srcObject=e.streams[0]||new MediaStream([e.track]);video.play().catch(()=>{});setStatus('✅ Connected to Grandpa’s screen');};
+ current.ontrack=e=>{
+  if(peer!==current)return;
+  video.srcObject=e.streams[0]||new MediaStream([e.track]);
+  video.play().catch(()=>{});
+  setStatus('✅ Connected to Grandpa’s screen');
+ };
  current.onicecandidate=e=>{if(peer===current&&e.candidate)send('candidate',e.candidate);};
  current.onconnectionstatechange=()=>{
-   if(peer!==current||finished)return;
-   if(current.connectionState==='connected'){clearTimeout(brokenTimer);brokenTimer=null;setStatus('✅ Connected to Grandpa’s screen');}
-   if(current.connectionState==='disconnected'){setStatus('Connection interrupted. Recovering…');clearTimeout(brokenTimer);brokenTimer=setTimeout(()=>{if(peer===current&&current.connectionState==='disconnected')requestRestart();},5000);}
-   if(current.connectionState==='failed')requestRestart();
+  if(peer!==current||finished)return;
+  if(current.connectionState==='connected'){
+   clearTimeout(brokenTimer);brokenTimer=null;
+   setStatus('✅ Connected to Grandpa’s screen');
+  }
+  if(current.connectionState==='disconnected'){
+   setStatus('Connection interrupted. Recovering…');
+   clearTimeout(brokenTimer);
+   brokenTimer=setTimeout(()=>{
+    if(peer===current&&current.connectionState==='disconnected')requestRestart();
+   },5000);
+  }
+  if(current.connectionState==='failed')requestRestart();
  };
 }
 async function processMessage(e){
@@ -34,19 +198,19 @@ async function processMessage(e){
  if(m.type==='peer-left'){dropPeer();setStatus('Grandpa disconnected. Waiting for reconnection…');return;}
  if(m.type==='paired'){createPeer();setStatus('Connecting to Grandpa’s screen…');return;}
  if(m.type==='offer'){
-   if(!peer)createPeer();const current=peer,version=negotiation;
-   await current.setRemoteDescription(m.data);if(version!==negotiation)return;
-   for(const c of pending){try{await current.addIceCandidate(c);}catch(e){console.warn('ICE candidate skipped',e);}}
-   pending=[];
-   const answer=await current.createAnswer();if(version!==negotiation)return;
-   await current.setLocalDescription(answer);if(version!==negotiation)return;
-   send('answer',current.localDescription);return;
+  if(!peer)createPeer();const current=peer,version=negotiation;
+  await current.setRemoteDescription(m.data);if(version!==negotiation)return;
+  for(const c of pending){try{await current.addIceCandidate(c);}catch(err){console.warn('ICE candidate skipped',err);}}
+  pending=[];
+  const answer=await current.createAnswer();if(version!==negotiation)return;
+  await current.setLocalDescription(answer);if(version!==negotiation)return;
+  send('answer',current.localDescription);return;
  }
  if(m.type==='candidate'&&m.data){
-   const candidate=new RTCIceCandidate(m.data);
-   if(peer?.remoteDescription){try{await peer.addIceCandidate(candidate);}catch(e){console.warn('ICE candidate skipped',e);}}
-   else pending.push(candidate);
-   return;
+  const candidate=new RTCIceCandidate(m.data);
+  if(peer?.remoteDescription){try{await peer.addIceCandidate(candidate);}catch(err){console.warn('ICE candidate skipped',err);}}
+  else pending.push(candidate);
+  return;
  }
  if(m.type==='ended'||m.type==='expired')end('Session ended. Ask for a new invitation.',false);
 }
@@ -58,23 +222,35 @@ function scheduleReconnect(){
 }
 function connectSocket(){
  if(finished)return;
- const ws=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/ws?token=${encodeURIComponent(token)}`);socket=ws;
+ const ws=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/ws?token=${encodeURIComponent(token)}`);
+ socket=ws;
  ws.onopen=()=>{if(socket!==ws)return;retryCount=0;};
- ws.onmessage=e=>{if(socket!==ws)return;processMessage(e).catch(err=>{console.error(err);requestRestart();});};
+ ws.onmessage=e=>{
+  if(socket!==ws)return;
+  processMessage(e).catch(err=>{console.error(err);requestRestart();});
+ };
  ws.onerror=()=>{};
  ws.onclose=e=>{
-   if(socket!==ws||finished)return;
-   socket=null;dropPeer();
-   if(e.code===1008){end('This link has expired or is already open. Create a new invitation.',false);return;}
-   scheduleReconnect();
+  if(socket!==ws||finished)return;
+  socket=null;dropPeer();
+  if(e.code===1008){end('This link has expired or is already open. Create a new invitation.',false);return;}
+  scheduleReconnect();
  };
 }
 document.getElementById('stop').addEventListener('click',()=>end('You ended the session.'));
 document.getElementById('fullscreen').addEventListener('click',async()=>{
- try{if(document.fullscreenElement)await document.exitFullscreen();else if(video.requestFullscreen)await video.requestFullscreen();else if(video.webkitEnterFullscreen)video.webkitEnterFullscreen();}
- catch(e){setStatus('Fullscreen is unavailable in this browser.');}
+ try{
+  if(document.fullscreenElement)await document.exitFullscreen();
+  else if(viewport.requestFullscreen)await viewport.requestFullscreen();
+  else if(video.webkitEnterFullscreen)video.webkitEnterFullscreen();
+  else setStatus('Fullscreen not supported. Turn your phone sideways for a larger view.');
+ }catch(err){setStatus('Fullscreen is unavailable here. Try rotating your phone.');}
 });
-window.addEventListener('online',()=>{if(!socket&&!finished){clearTimeout(retryTimer);retryTimer=null;connectSocket();}});
-if(!token)setStatus('Missing viewer invitation.');
-else{history.replaceState(null,'',location.pathname);connectSocket();}
-</script></body></html>
+window.addEventListener('online',()=>{
+ if(!socket&&!finished){clearTimeout(retryTimer);retryTimer=null;connectSocket();}
+});
+if(!token){setStatus('Missing viewer invitation. Open your viewer link.');document.getElementById('stop').disabled=true;}
+else connectSocket();
+</script>
+</body>
+</html>
