@@ -1,210 +1,80 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Support</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-:root {
-  --night: #0f1c2e;
-  --ink: #f2f4f8;
-  --ink-soft: #9aacc4;
-  --gold: #e3a857;
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Grandpa Connect — Viewer</title><style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100dvh;background:#101e31;color:#f8fafc;font:16px system-ui,Arial,sans-serif}header{text-align:center;padding:18px 12px 5px}header h1{font-size:21px;margin:0}main{max-width:1350px;margin:auto;padding:12px;text-align:center}#status{color:#c1d4e7;min-height:2.5em;margin:10px 0}video{width:100%;max-height:77dvh;object-fit:contain;background:#000;border-radius:14px}nav{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:14px}button{border:1px solid #52627b;background:#253750;color:#fff;border-radius:12px;padding:14px 20px;font-size:16px;min-height:49px;cursor:pointer}#stop{color:#ffbfc6;border-color:#74444b}small{display:block;color:#9cacc3;margin-top:12px}@media(max-width:600px){main{padding:4px}header{padding:10px}video{max-height:80dvh;border-radius:5px}button{flex:1}}
+</style></head><body><header><h1>❤️ Grandpa Connect</h1></header><main>
+<p id="status" role="status" aria-live="polite">Connecting securely…</p>
+<video id="screen" autoplay playsinline muted></video>
+<nav><button id="fullscreen">⛶ Fullscreen</button><button id="stop">End session</button></nav>
+<small>Screen viewing only. Grandpa can stop sharing at any time.</small>
+</main><script>
+const statusEl=document.getElementById('status'),video=document.getElementById('screen');
+const token=new URLSearchParams(location.search).get('token');
+let socket=null,peer=null,iceServers=[],finished=false,retryTimer=null,retryCount=0,brokenTimer=null,pending=[],negotiation=0,lastRestart=0;
+function setStatus(t){statusEl.textContent=t;}
+function send(type,data){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify({type,data}));}
+function dropPeer(){negotiation++;clearTimeout(brokenTimer);brokenTimer=null;pending=[];const old=peer;peer=null;if(old)old.close();video.srcObject=null;}
+function end(message,notify=true){if(finished)return;finished=true;clearTimeout(retryTimer);dropPeer();if(notify)send('end');if(socket){socket.close();socket=null;}setStatus(message);}
+function requestRestart(){if(finished)return;setStatus('Connection interrupted. Reconnecting…');if(Date.now()-lastRestart<6000)return;lastRestart=Date.now();if(socket?.readyState===WebSocket.OPEN)send('restart');else scheduleReconnect();}
+function createPeer(){
+ dropPeer();const current=new RTCPeerConnection({iceServers});peer=current;
+ current.ontrack=e=>{if(peer!==current)return;video.srcObject=e.streams[0]||new MediaStream([e.track]);video.play().catch(()=>{});setStatus('✅ Connected to Grandpa’s screen');};
+ current.onicecandidate=e=>{if(peer===current&&e.candidate)send('candidate',e.candidate);};
+ current.onconnectionstatechange=()=>{
+   if(peer!==current||finished)return;
+   if(current.connectionState==='connected'){clearTimeout(brokenTimer);brokenTimer=null;setStatus('✅ Connected to Grandpa’s screen');}
+   if(current.connectionState==='disconnected'){setStatus('Connection interrupted. Recovering…');clearTimeout(brokenTimer);brokenTimer=setTimeout(()=>{if(peer===current&&current.connectionState==='disconnected')requestRestart();},5000);}
+   if(current.connectionState==='failed')requestRestart();
+ };
 }
-* { box-sizing: border-box; }
-html, body {
-  margin: 0;
-  background: var(--night);
-  color: var(--ink);
-  font-family: "Inter", Arial, sans-serif;
+async function processMessage(e){
+ const m=JSON.parse(e.data);if(finished)return;
+ if(m.type==='config'){iceServers=m.data?.iceServers||[];return;}
+ if(m.type==='waiting'){dropPeer();setStatus('Waiting for Grandpa to start sharing…');return;}
+ if(m.type==='peer-left'){dropPeer();setStatus('Grandpa disconnected. Waiting for reconnection…');return;}
+ if(m.type==='paired'){createPeer();setStatus('Connecting to Grandpa’s screen…');return;}
+ if(m.type==='offer'){
+   if(!peer)createPeer();const current=peer,version=negotiation;
+   await current.setRemoteDescription(m.data);if(version!==negotiation)return;
+   for(const c of pending){try{await current.addIceCandidate(c);}catch(e){console.warn('ICE candidate skipped',e);}}
+   pending=[];
+   const answer=await current.createAnswer();if(version!==negotiation)return;
+   await current.setLocalDescription(answer);if(version!==negotiation)return;
+   send('answer',current.localDescription);return;
+ }
+ if(m.type==='candidate'&&m.data){
+   const candidate=new RTCIceCandidate(m.data);
+   if(peer?.remoteDescription){try{await peer.addIceCandidate(candidate);}catch(e){console.warn('ICE candidate skipped',e);}}
+   else pending.push(candidate);
+   return;
+ }
+ if(m.type==='ended'||m.type==='expired')end('Session ended. Ask for a new invitation.',false);
 }
-body { padding-bottom: 40px; }
-.mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 24px;
-  color: var(--ink-soft);
+function scheduleReconnect(){
+ if(finished||retryTimer)return;
+ setStatus('Internet interrupted. Trying to reconnect…');
+ const delay=Math.min(1000*2**Math.min(retryCount++,4),15000);
+ retryTimer=setTimeout(()=>{retryTimer=null;connectSocket();},delay);
 }
-.mark svg { width: 18px; height: 18px; }
-.mark span {
-  font-family: "Fraunces", serif;
-  font-size: 17px;
-  font-weight: 500;
-  color: var(--ink);
+function connectSocket(){
+ if(finished)return;
+ const ws=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/ws?token=${encodeURIComponent(token)}`);socket=ws;
+ ws.onopen=()=>{if(socket!==ws)return;retryCount=0;};
+ ws.onmessage=e=>{if(socket!==ws)return;processMessage(e).catch(err=>{console.error(err);requestRestart();});};
+ ws.onerror=()=>{};
+ ws.onclose=e=>{
+   if(socket!==ws||finished)return;
+   socket=null;dropPeer();
+   if(e.code===1008){end('This link has expired or is already open. Create a new invitation.',false);return;}
+   scheduleReconnect();
+ };
 }
-main { max-width: 1100px; margin: 0 auto; padding: 0 24px; text-align: center; }
-#status { color: var(--ink-soft); font-size: 16px; }
-video {
-  width: 100%;
-  margin-top: 20px;
-  background: black;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-}
-button {
-  padding: 14px 28px;
-  background: transparent;
-  color: var(--ink-soft);
-  border: 1px solid #2a3c56;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 24px;
-}
-button:hover { border-color: #e17b7b; color: #e17b7b; }
-</style>
-</head>
-<body>
-<div class="mark">
-  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="12" cy="12" r="3" fill="currentColor"/>
-    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-  </svg>
-  <span>Support</span>
-</div>
-<main>
-  <p id="status">Connecting securely…</p>
-  <video id="screen" autoplay playsinline muted controls></video>
-  <p><button id="stopBtn">End session</button></p>
-</main>
-
-<script>
-const statusEl = document.getElementById("status");
-const video = document.getElementById("screen");
-const stopBtn = document.getElementById("stopBtn");
-const token = new URLSearchParams(location.search).get("token");
-
-let socket = null;
-let peer = null;
-let finished = false;
-let pendingCandidates = [];
-
-function send(type, data) {
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ type, data }));
-  }
-}
-
-function finish(message) {
-  if (finished) return;
-  finished = true;
-  if (peer) peer.close();
-  if (socket) socket.close();
-  video.srcObject = null;
-  statusEl.textContent = message;
-}
-
-function createPeer(iceServers) {
-  peer = new RTCPeerConnection({ iceServers: iceServers || [] });
-
-  peer.ontrack = event => {
-    video.srcObject = event.streams[0] || new MediaStream([event.track]);
-    statusEl.textContent = "Grandpa's screen is connected ❤️";
-    video.play().catch(() => {});
-  };
-
-  peer.onicecandidate = event => {
-    if (event.candidate) send("candidate", event.candidate);
-  };
-
-  peer.onconnectionstatechange = () => {
-    if (!peer || finished) return;
-    if (peer.connectionState === "failed") {
-      statusEl.textContent =
-        "Connection failed. A TURN relay server is probably needed (see README).";
-    }
-    if (peer.connectionState === "disconnected") {
-      statusEl.textContent = "Connection interrupted...";
-    }
-    if (peer.connectionState === "connected") {
-      statusEl.textContent = "Grandpa's screen is connected ❤️";
-    }
-  };
-}
-
-async function handleOffer(offer) {
-  await peer.setRemoteDescription(offer);
-  for (const c of pendingCandidates) await peer.addIceCandidate(c);
-  pendingCandidates = [];
-  const answer = await peer.createAnswer();
-  await peer.setLocalDescription(answer);
-  send("answer", peer.localDescription);
-  statusEl.textContent = "Connecting to Grandpa's screen...";
-}
-
-async function handleMessage(event) {
-  const message = JSON.parse(event.data);
-
-  if (message.type === "config") {
-    createPeer(message.data.iceServers);
-    return;
-  }
-  if (message.type === "waiting") {
-    statusEl.textContent = "Waiting for Grandpa to accept...";
-    return;
-  }
-  if (message.type === "paired") {
-    statusEl.textContent = "Grandpa accepted. Waiting for his screen...";
-    return;
-  }
-  if (message.type === "offer" && peer) {
-    await handleOffer(message.data);
-    return;
-  }
-  if (message.type === "candidate" && message.data && peer) {
-    const candidate = new RTCIceCandidate(message.data);
-    if (peer.remoteDescription) {
-      await peer.addIceCandidate(candidate);
-    } else {
-      pendingCandidates.push(candidate);
-    }
-    return;
-  }
-  if (message.type === "ended") {
-    finish("Grandpa has ended the session.");
-    return;
-  }
-  if (message.type === "expired") {
-    finish("This invitation has expired.");
-  }
-}
-
-if (!token) {
-  statusEl.textContent = "Invalid or missing invitation.";
-} else {
-  history.replaceState(null, "", location.pathname);
-
-  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-  socket = new WebSocket(
-    `${protocol}//${location.host}/ws?token=${encodeURIComponent(token)}`
-  );
-
-  socket.onmessage = event => {
-    handleMessage(event).catch(err => {
-      console.error(err);
-      statusEl.textContent = "Connection error. Please create a new invitation.";
-    });
-  };
-
-  socket.onerror = () => {
-    if (!finished) statusEl.textContent = "Unable to connect to the server.";
-  };
-
-  socket.onclose = event => {
-    if (finished) return;
-    statusEl.textContent = event.reason
-      ? "Connection closed: " + event.reason
-      : "Connection closed.";
-  };
-}
-
-stopBtn.addEventListener("click", () => finish("You ended the session."));
-</script>
-</body>
-</html>
+document.getElementById('stop').addEventListener('click',()=>end('You ended the session.'));
+document.getElementById('fullscreen').addEventListener('click',async()=>{
+ try{if(document.fullscreenElement)await document.exitFullscreen();else if(video.requestFullscreen)await video.requestFullscreen();else if(video.webkitEnterFullscreen)video.webkitEnterFullscreen();}
+ catch(e){setStatus('Fullscreen is unavailable in this browser.');}
+});
+window.addEventListener('online',()=>{if(!socket&&!finished){clearTimeout(retryTimer);retryTimer=null;connectSocket();}});
+if(!token)setStatus('Missing viewer invitation.');
+else{history.replaceState(null,'',location.pathname);connectSocket();}
+</script></body></html>

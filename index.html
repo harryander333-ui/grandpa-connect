@@ -1,356 +1,93 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Support</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Grandpa Connect — Share Screen</title>
 <style>
-:root {
-  --night: #0f1c2e;
-  --panel: #16263d;
-  --ink: #f2f4f8;
-  --ink-soft: #9aacc4;
-  --gold: #e3a857;
-  --gold-bright: #f4c27a;
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100dvh;background:#101e31;color:#fff;font:18px system-ui,Arial,sans-serif;display:grid;place-items:center;padding:22px}main{text-align:center;max-width:500px;width:100%}h1{font-size:clamp(28px,5vw,42px);margin:0 0 15px}p{line-height:1.55;color:#c6d5e6}button{border:0;border-radius:18px;background:#eab46c;color:#18120b;font-weight:800;font-size:clamp(22px,5vw,30px);padding:27px 18px;width:100%;cursor:pointer}button:disabled{opacity:.6;cursor:default}.stop{background:#342b36;color:#ffc4c4;border:1px solid #84525b;font-size:17px;padding:17px;margin-top:22px}.hidden{display:none}#status{min-height:3em;margin-top:22px}small{color:#b5c2d6;display:block;margin-top:15px}
+</style></head><body><main>
+<h1>❤️ Grandpa Connect</h1>
+<p id="guide">Press the big button, choose your screen and click Share.</p>
+<button id="share">Share my screen</button>
+<button id="stop" class="stop hidden">Stop sharing</button>
+<p id="status" role="status" aria-live="polite">Ready when you are.</p>
+<small>Screen sharing stays visible. You can stop it at any time.</small>
+</main><script>
+const token=new URLSearchParams(location.search).get('invite');
+const share=document.getElementById('share'),stop=document.getElementById('stop'),statusEl=document.getElementById('status');
+let stream=null,socket=null,peer=null,iceServers=[],finished=false,retryTimer=null,retryCount=0,brokenTimer=null,negotiation=0,pending=[],waitingForAnswer=false,lastRestart=0;
+const setStatus=t=>{statusEl.textContent=t;};
+function send(type,data){if(socket?.readyState===WebSocket.OPEN) socket.send(JSON.stringify({type,data}));}
+function dropPeer(){negotiation++;clearTimeout(brokenTimer);brokenTimer=null;pending=[];waitingForAnswer=false;const old=peer;peer=null;if(old) old.close();}
+function end(message,notify=true){if(finished)return;finished=true;clearTimeout(retryTimer);dropPeer();if(notify)send('end');if(socket){socket.close();socket=null;}if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}share.disabled=true;stop.classList.add('hidden');setStatus(message);}
+function createPeer(){
+ dropPeer();const current=new RTCPeerConnection({iceServers});peer=current;
+ for(const track of stream.getTracks())current.addTrack(track,stream);
+ current.onicecandidate=e=>{if(e.candidate&&peer===current)send('candidate',e.candidate);};
+ current.onconnectionstatechange=()=>{
+   if(peer!==current||finished)return;
+   if(current.connectionState==='connected'){clearTimeout(brokenTimer);brokenTimer=null;setStatus('✅ Your screen is being shared.');}
+   if(current.connectionState==='disconnected'){setStatus('Connection interrupted. Recovering…');clearTimeout(brokenTimer);brokenTimer=setTimeout(()=>{if(peer===current&&current.connectionState==='disconnected')requestRestart();},5000);}
+   if(current.connectionState==='failed')requestRestart();
+ };
 }
-* { box-sizing: border-box; }
-html, body {
-  margin: 0;
-  height: 100%;
-  background: var(--night);
-  color: var(--ink);
-  font-family: "Inter", Arial, sans-serif;
+function requestRestart(){if(finished||!stream)return;setStatus('Reconnecting automatically…');if(Date.now()-lastRestart<6000)return;lastRestart=Date.now();if(socket?.readyState===WebSocket.OPEN)send('restart');else scheduleReconnect();}
+async function makeOffer(){
+ if(!stream||finished||waitingForAnswer)return;
+ createPeer();const current=peer,version=negotiation;waitingForAnswer=true;
+ try{const offer=await current.createOffer();if(version!==negotiation)return;await current.setLocalDescription(offer);if(version!==negotiation)return;send('offer',current.localDescription);setStatus('Connecting…');}
+ catch(e){console.error(e);requestRestart();}
 }
-body {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 32px 24px;
-  text-align: center;
-  overflow-x: hidden;
+async function processMessage(e){
+ const m=JSON.parse(e.data);if(finished)return;
+ if(m.type==='config'){iceServers=m.data?.iceServers||[];return;}
+ if(m.type==='waiting'){dropPeer();setStatus('Waiting for your family member…');return;}
+ if(m.type==='peer-left'){dropPeer();setStatus('Other device disconnected. Waiting for it to reconnect…');return;}
+ if(m.type==='paired'){await makeOffer();return;}
+ if(m.type==='answer'&&peer){
+   const current=peer;if(current.signalingState!=='have-local-offer')return;
+   await current.setRemoteDescription(m.data);if(peer!==current)return;
+   for(const c of pending){try{await current.addIceCandidate(c);}catch(e){console.warn('ICE candidate skipped',e);}}
+   pending=[];waitingForAnswer=false;return;
+ }
+ if(m.type==='candidate'&&m.data&&peer){
+   const candidate=new RTCIceCandidate(m.data);
+   if(peer.remoteDescription){try{await peer.addIceCandidate(candidate);}catch(e){console.warn('ICE candidate skipped',e);}}
+   else pending.push(candidate);
+   return;
+ }
+ if(m.type==='ended'||m.type==='expired')end('Session ended. Ask for a new invitation.',false);
 }
-.mark {
-  position: fixed;
-  top: 28px;
-  left: 0;
-  right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: var(--ink-soft);
+function scheduleReconnect(){
+ if(finished||!stream||retryTimer)return;
+ setStatus('Internet interrupted. Trying to reconnect…');
+ const delay=Math.min(1000*2**Math.min(retryCount++,4),15000);
+ retryTimer=setTimeout(()=>{retryTimer=null;connectSocket();},delay);
 }
-.mark svg { width: 20px; height: 20px; }
-.mark span {
-  font-family: "Fraunces", serif;
-  font-size: 19px;
-  font-weight: 500;
-  color: var(--ink);
+function connectSocket(){
+ if(finished||!stream)return;
+ const url=`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/ws?token=${encodeURIComponent(token)}`;
+ const ws=new WebSocket(url);socket=ws;
+ ws.onopen=()=>{if(socket!==ws)return;retryCount=0;};
+ ws.onmessage=e=>{if(socket!==ws)return;processMessage(e).catch(err=>{console.error(err);requestRestart();});};
+ ws.onerror=()=>{};
+ ws.onclose=e=>{
+   if(socket!==ws||finished)return;
+   socket=null;dropPeer();
+   if(e.code===1008){end('This session has expired or is already open. Ask for a new invitation.',false);return;}
+   scheduleReconnect();
+ };
 }
-.stage {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+if(!token){share.disabled=true;setStatus('Please open the invitation link sent to you.');}
+else if(!navigator.mediaDevices?.getDisplayMedia){share.disabled=true;setStatus('Open this link on a Windows or Mac computer in Chrome or Edge.');}
+else{
+ history.replaceState(null,'',location.pathname);
+ share.addEventListener('click',async()=>{
+   share.disabled=true;setStatus('Choose the screen to share in the browser popup…');
+   try{stream=await navigator.mediaDevices.getDisplayMedia({video:{displaySurface:'monitor'},audio:false,selfBrowserSurface:'exclude'});}
+   catch(e){share.disabled=false;setStatus('Screen sharing was not started. Press the button to try again.');return;}
+   stream.getVideoTracks()[0]?.addEventListener('ended',()=>end('You stopped sharing.'));
+   share.classList.add('hidden');stop.classList.remove('hidden');connectSocket();
+ });
+ stop.addEventListener('click',()=>end('You stopped sharing.'));
+ window.addEventListener('online',()=>{if(!socket&&!finished&&stream){clearTimeout(retryTimer);retryTimer=null;connectSocket();}});
 }
-.beacon {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 440px;
-  height: 440px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(227, 168, 87, 0.22), transparent 65%);
-  animation: pulse 3.2s ease-in-out infinite;
-  pointer-events: none;
-}
-@keyframes pulse {
-  0%, 100% { opacity: .55; transform: translate(-50%, -50%) scale(0.92); }
-  50% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-}
-#hint {
-  position: relative;
-  font-family: "Fraunces", serif;
-  font-size: 28px;
-  font-weight: 500;
-  color: var(--ink);
-  margin: 0 0 18px;
-  max-width: 420px;
-  line-height: 1.35;
-}
-#hint.show { display: block; }
-#hint:not(.show) { display: none; }
-#chevron {
-  position: relative;
-  display: none;
-  margin-bottom: 20px;
-  animation: bob 1.4s ease-in-out infinite;
-}
-#chevron.show { display: block; }
-#chevron svg { width: 30px; height: 30px; color: var(--gold); }
-@keyframes bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(10px); }
-}
-button {
-  position: relative;
-  background: var(--gold);
-  color: #1a1206;
-  border: 0;
-  border-radius: 18px;
-  padding: 40px 56px;
-  font-family: "Fraunces", serif;
-  font-size: 34px;
-  font-weight: 600;
-  cursor: pointer;
-  width: 100%;
-  max-width: 400px;
-  box-shadow: 0 14px 40px rgba(227, 168, 87, 0.25);
-  transition: transform .15s ease, box-shadow .15s ease;
-}
-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 48px rgba(227, 168, 87, 0.32);
-}
-button:disabled {
-  opacity: .4;
-  cursor: default;
-  box-shadow: none;
-}
-#status {
-  position: relative;
-  margin-top: 28px;
-  color: var(--ink-soft);
-  font-size: 18px;
-  line-height: 1.5;
-  max-width: 420px;
-  min-height: 1.5em;
-}
-@media (prefers-reduced-motion: reduce) {
-  .beacon, #chevron { animation: none; }
-}
-</style>
-</head>
-<body>
-  <div class="mark">
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="12" cy="12" r="3" fill="currentColor"/>
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-    </svg>
-    <span>Support</span>
-  </div>
-  <div class="stage">
-    <div class="beacon" aria-hidden="true"></div>
-    <p id="chevron" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </p>
-    <p id="hint">When you're ready, press the button below — then press "Share".</p>
-    <button id="accept">Share my screen</button>
-    <p id="status" aria-live="polite"></p>
-  </div>
-
-<script>
-const button = document.getElementById("accept");
-const statusEl = document.getElementById("status");
-const hint = document.getElementById("hint");
-const chevron = document.getElementById("chevron");
-const token = new URLSearchParams(location.search).get("invite");
-
-let socket = null;
-let peer = null;
-let stream = null;
-let iceServers = null;
-let paired = false;
-let offerStarted = false;
-let finished = false;
-let pendingCandidates = [];
-
-function send(type, data) {
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ type, data }));
-  }
-}
-
-function finish(message) {
-  finished = true;
-  if (stream) {
-    stream.getTracks().forEach(t => t.stop());
-    stream = null;
-  }
-  if (peer) {
-    peer.close();
-    peer = null;
-  }
-  if (socket) {
-    const s = socket;
-    socket = null;
-    s.close();
-  }
-  statusEl.textContent = message;
-  button.disabled = true; // invitation is single-use; ask for a new one
-}
-
-function createPeer() {
-  peer = new RTCPeerConnection({ iceServers: iceServers || [] });
-
-  stream.getTracks().forEach(track => peer.addTrack(track, stream));
-
-  peer.onicecandidate = event => {
-    if (event.candidate) send("candidate", event.candidate);
-  };
-
-  peer.onconnectionstatechange = () => {
-    if (!peer) return;
-    if (peer.connectionState === "connected") {
-      statusEl.textContent = "Your screen is being shared.";
-    }
-    if (peer.connectionState === "failed") {
-      finish("Connection failed. Please ask for a new invitation.");
-    }
-  };
-
-  const track = stream.getVideoTracks()[0];
-  if (track) {
-    track.addEventListener("ended", () => {
-      if (!finished) finish("Screen sharing stopped.");
-    });
-  }
-}
-
-async function startOffer() {
-  if (!paired || !peer || offerStarted) return;
-  offerStarted = true;
-  statusEl.textContent = "Connecting...";
-  const offer = await peer.createOffer();
-  await peer.setLocalDescription(offer);
-  send("offer", peer.localDescription);
-}
-
-async function handleMessage(event) {
-  const message = JSON.parse(event.data);
-
-  if (message.type === "config") {
-    iceServers = message.data.iceServers;
-    createPeer();
-    return;
-  }
-
-  if (message.type === "waiting") {
-    statusEl.textContent = "Waiting for your family member to connect...";
-    return;
-  }
-
-  if (message.type === "paired") {
-    paired = true;
-    await startOffer();
-    return;
-  }
-
-  if (message.type === "answer" && peer) {
-    await peer.setRemoteDescription(message.data);
-    for (const c of pendingCandidates) await peer.addIceCandidate(c);
-    pendingCandidates = [];
-    return;
-  }
-
-  if (message.type === "candidate" && message.data && peer) {
-    const candidate = new RTCIceCandidate(message.data);
-    if (peer.remoteDescription) {
-      await peer.addIceCandidate(candidate);
-    } else {
-      pendingCandidates.push(candidate);
-    }
-    return;
-  }
-
-  if (message.type === "ended" || message.type === "expired") {
-    finish("Session ended.");
-  }
-}
-
-function openSocket() {
-  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-  socket = new WebSocket(
-    `${protocol}//${location.host}/ws?token=${encodeURIComponent(token)}`
-  );
-
-  socket.onmessage = event => {
-    handleMessage(event).catch(err => {
-      console.error(err);
-      finish("Connection error. Please ask for a new invitation.");
-    });
-  };
-
-  socket.onerror = () => {
-    if (!finished) statusEl.textContent = "Unable to connect to the server.";
-  };
-
-  socket.onclose = event => {
-    if (finished) return;
-    finish(event.reason
-      ? "Connection closed: " + event.reason
-      : "Connection closed.");
-  };
-}
-
-if (!token) {
-  hint.classList.remove("show");
-  chevron.classList.remove("show");
-  button.disabled = true;
-  statusEl.textContent = "This link doesn't work anymore. Please ask for a new one.";
-} else if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-  // Phones and tablets cannot share their screen from a web page.
-  hint.classList.remove("show");
-  chevron.classList.remove("show");
-  button.disabled = true;
-  statusEl.textContent =
-    "This only works on a computer, not a phone or tablet. " +
-    "Please open this link on your computer instead.";
-} else {
-  // Hide the secret token from the address bar
-  history.replaceState(null, "", location.pathname);
-  hint.classList.add("show");
-  chevron.classList.add("show");
-
-  button.addEventListener("click", async () => {
-    button.disabled = true;
-    hint.classList.remove("show");
-    chevron.classList.remove("show");
-    statusEl.textContent = "A box will open at the top of your screen — click \"Share\" in it.";
-
-    try {
-      stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          // Hints the browser to open on "Entire Screen" first.
-          // Chrome/Edge respect this; other browsers ignore it safely.
-          displaySurface: "monitor"
-        },
-        audio: false,
-        // Don't offer "this tab" as a sharing option — it's never useful here.
-        selfBrowserSurface: "exclude",
-        // Keep sharing the chosen screen even if the user switches tabs/windows.
-        surfaceSwitching: "exclude"
-      });
-    } catch (err) {
-      stream = null;
-      button.disabled = false;
-      hint.classList.add("show");
-      chevron.classList.add("show");
-      statusEl.textContent = "That didn't work. Please press the button again.";
-      return;
-    }
-
-    statusEl.textContent = "Connecting...";
-    openSocket();
-  });
-}
-</script>
-</body>
-</html>
+</script></body></html>
