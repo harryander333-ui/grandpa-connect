@@ -3,40 +3,76 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Grandpa Connect - Viewer</title>
+<title>Support</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  padding: 25px;
-  background: #15191f;
-  color: white;
-  font-family: Arial, sans-serif;
-  text-align: center;
+:root {
+  --night: #0f1c2e;
+  --ink: #f2f4f8;
+  --ink-soft: #9aacc4;
+  --gold: #e3a857;
 }
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  background: var(--night);
+  color: var(--ink);
+  font-family: "Inter", Arial, sans-serif;
+}
+body { padding-bottom: 40px; }
+.mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--ink-soft);
+}
+.mark svg { width: 18px; height: 18px; }
+.mark span {
+  font-family: "Fraunces", serif;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--ink);
+}
+main { max-width: 1100px; margin: 0 auto; padding: 0 24px; text-align: center; }
+#status { color: var(--ink-soft); font-size: 16px; }
 video {
   width: 100%;
-  max-width: 1200px;
-  margin-top: 25px;
+  margin-top: 20px;
   background: black;
-  border-radius: 12px;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
 }
 button {
-  padding: 13px 24px;
-  background: #b83232;
-  color: white;
-  border: 0;
-  border-radius: 8px;
+  padding: 14px 28px;
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid #2a3c56;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
+  margin-top: 24px;
 }
-#status { color: #bbb; }
+button:hover { border-color: #e17b7b; color: #e17b7b; }
 </style>
 </head>
 <body>
-<h1>Grandpa Connect ❤️</h1>
-<p id="status">Connecting securely...</p>
-<video id="screen" autoplay playsinline muted controls></video>
-<p><button id="stopBtn">END SESSION</button></p>
+<div class="mark">
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="3" fill="currentColor"/>
+    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+  <span>Support</span>
+</div>
+<main>
+  <p id="status">Connecting securely…</p>
+  <video id="screen" autoplay playsinline muted controls></video>
+  <p><button id="stopBtn">End session</button></p>
+</main>
 
 <script>
 const statusEl = document.getElementById("status");

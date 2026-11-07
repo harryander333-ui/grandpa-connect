@@ -3,53 +3,108 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Grandpa Connect Dashboard</title>
+<title>Support</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-body {
+:root {
+  --night: #0f1c2e;
+  --panel: #16263d;
+  --ink: #f2f4f8;
+  --ink-soft: #9aacc4;
+  --gold: #e3a857;
+}
+* { box-sizing: border-box; }
+html, body {
   margin: 0;
   min-height: 100vh;
-  display: grid;
-  place-items: center;
-  background: #15191f;
-  color: white;
-  font-family: Arial, sans-serif;
+  background: var(--night);
+  color: var(--ink);
+  font-family: "Inter", Arial, sans-serif;
 }
-main { width: min(90%, 480px); text-align: center; padding: 20px 0; }
-button {
-  width: 100%;
-  padding: 22px;
-  background: #159447;
-  color: white;
-  border: 0;
-  border-radius: 14px;
-  font-size: 22px;
-  font-weight: bold;
-  cursor: pointer;
+body { display: flex; flex-direction: column; align-items: center; padding: 28px 20px; }
+.mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-soft);
+  margin-bottom: 36px;
 }
-button:disabled { opacity: .6; }
+.mark svg { width: 20px; height: 20px; }
+.mark span {
+  font-family: "Fraunces", serif;
+  font-size: 19px;
+  font-weight: 500;
+  color: var(--ink);
+}
+main {
+  width: min(94%, 420px);
+  background: var(--panel);
+  border-radius: 20px;
+  padding: 36px 32px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+}
+h1 {
+  font-family: "Fraunces", serif;
+  font-size: 26px;
+  font-weight: 500;
+  margin: 0 0 8px;
+}
+main > p.lead { color: var(--ink-soft); margin: 0 0 28px; font-size: 15px; line-height: 1.5; }
+label {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+}
 input {
   width: 100%;
-  box-sizing: border-box;
-  padding: 14px;
-  margin: 8px 0 18px;
-  border-radius: 8px;
-  border: 1px solid #777;
+  padding: 14px 16px;
+  margin-bottom: 22px;
+  border-radius: 10px;
+  border: 1px solid #2a3c56;
+  background: #0f1c2e;
+  color: var(--ink);
+  font-size: 16px;
 }
-a { color: #83d8a2; overflow-wrap: anywhere; }
-.result { margin-top: 24px; }
-.error { color: #ff8a8a; }
+input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+button {
+  width: 100%;
+  padding: 17px;
+  background: var(--gold);
+  color: #1a1206;
+  border: 0;
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+button:disabled { opacity: .5; cursor: default; }
+a { color: var(--gold); overflow-wrap: anywhere; }
+.result { margin-top: 24px; text-align: left; font-size: 15px; color: var(--ink-soft); }
+.result h3 { color: var(--ink); font-size: 14px; font-weight: 600; margin: 18px 0 6px; }
+.result h3:first-child { margin-top: 0; }
+.error { color: #e17b7b; }
 </style>
 </head>
 <body>
+<div class="mark">
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="3" fill="currentColor"/>
+    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>
+  <span>Support</span>
+</div>
 <main>
-  <h1>Grandpa Connect ❤️</h1>
-  <p>Your private support dashboard</p>
+  <h1>Create an invitation</h1>
+  <p class="lead">Generate a private link to connect.</p>
 
-  <label for="secret">Private owner secret</label>
+  <label for="secret">Owner secret</label>
   <input id="secret" type="password" autocomplete="off"
-         placeholder="Enter your private secret">
+         placeholder="Enter your secret">
 
-  <button id="create">CREATE INVITATION</button>
+  <button id="create">Create invitation</button>
   <div class="result" id="result" aria-live="polite"></div>
 </main>
 
@@ -103,8 +158,8 @@ async function createInvitation() {
     result.innerHTML = "";
 
     for (const [label, url] of [
-      ["Grandpa's invitation", data.grandpaUrl],
-      ["Your private viewer", data.viewerUrl]
+      ["Invitation link", data.grandpaUrl],
+      ["Your viewer link", data.viewerUrl]
     ]) {
       const heading = document.createElement("h3");
       heading.textContent = label;
@@ -114,12 +169,12 @@ async function createInvitation() {
       if (/^https?:\/\//.test(url)) link.href = url;
 
       const copy = document.createElement("button");
-      copy.textContent = "COPY " + label.toUpperCase();
+      copy.textContent = "Copy " + label.toLowerCase();
       copy.style.marginTop = "12px";
       copy.addEventListener("click", async () => {
         try {
           await navigator.clipboard.writeText(url);
-          copy.textContent = "COPIED!";
+          copy.textContent = "Copied";
         } catch {
           // Fallback: select the link text so it can be copied manually
           const range = document.createRange();
@@ -127,7 +182,7 @@ async function createInvitation() {
           const sel = getSelection();
           sel.removeAllRanges();
           sel.addRange(range);
-          copy.textContent = "PRESS CTRL+C TO COPY";
+          copy.textContent = "Press Ctrl+C to copy";
         }
       });
 
@@ -135,8 +190,9 @@ async function createInvitation() {
     }
 
     const expiry = document.createElement("p");
+    expiry.style.marginTop = "18px";
     expiry.textContent =
-      "The invitation must be accepted within 30 minutes. Each link works once.";
+      "Each link works once, and must be used within 30 minutes.";
     result.append(expiry);
   } catch (error) {
     showError(error.message);
