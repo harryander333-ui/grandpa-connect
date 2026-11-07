@@ -1,210 +1,39 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Support</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-:root {
-  --night: #0f1c2e;
-  --panel: #16263d;
-  --ink: #f2f4f8;
-  --ink-soft: #9aacc4;
-  --gold: #e3a857;
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Support — Dashboard</title><style>
+:root{color-scheme:light;--blue:#155bd4;--ink:#172b46;--muted:#66788e;--border:#dce5f0}*{box-sizing:border-box}body{margin:0;min-height:100dvh;background:#f3f6fa;color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}header{background:white;border-bottom:1px solid var(--border);padding:18px clamp(18px,5vw,68px);display:flex;justify-content:space-between;align-items:center}.brand{font-size:21px;font-weight:800;display:flex;gap:12px;align-items:center}.logo{background:#eaf1ff;color:#175cd3;border-radius:12px;width:40px;height:40px;display:grid;place-items:center}header small{color:var(--muted)}.shell{max-width:750px;margin:50px auto;padding:0 16px}h1{font-size:clamp(30px,5vw,41px);letter-spacing:-1.2px;margin:0 0 8px}.subtitle{margin:0 0 25px;color:var(--muted);font-size:18px}.panel{background:white;border:1px solid var(--border);border-radius:22px;padding:clamp(22px,5vw,35px);box-shadow:0 15px 38px rgba(20,45,70,.05)}label{font-size:14px;font-weight:700;display:block;margin:0 0 9px}input{width:100%;border:1px solid #cdd8e7;border-radius:12px;padding:16px;font:inherit;color:var(--ink);background:#fff;margin:0 0 17px}input:focus-visible{outline:3px solid #b5cdfa}button{border:0;border-radius:12px;font:750 16px system-ui;cursor:pointer;padding:16px 20px;min-height:52px}.primary{width:100%;background:var(--blue);color:white}.primary:hover{background:#1049ab}.primary:disabled{opacity:.55}.secondary{background:#eaf1ff;color:#124cae;border:1px solid #bfd3f4}.secondary:hover{background:#dce9ff}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.actions button{flex:1 1 135px}.link-card{margin-top:15px;padding:20px;border:1px solid var(--border);border-radius:16px;background:#f9fbfe}.link-card h3{font-size:16px;margin:0 0 5px}.link-card p{color:var(--muted);font-size:14px;margin:0 0 11px}.link-card a{display:block;color:#155bd4;font-size:13px;overflow-wrap:anywhere}.link-card button{width:100%;margin-top:15px}.hint{color:#78869a;font-size:13px;margin:15px 0 0}.error{color:#a51e30}.success{color:#166534}#result:empty{display:none}footer{text-align:center;color:#7a8aa0;font-size:13px;margin:24px 0}@media(max-width:500px){header small{display:none}.shell{margin:25px auto}.panel{border-radius:18px}}
+</style></head><body><header><div class="brand"><span class="logo">✦</span>Support</div><small>Private support sessions</small></header><main class="shell"><h1>Start a support session</h1><p class="subtitle">Create a private link and help someone with their screen.</p><div class="panel"><label for="secret">Your owner password</label><input id="secret" type="password" autocomplete="off" placeholder="Enter password"><button type="button" id="create" class="primary">Create support session</button><p id="message" aria-live="polite" role="status"></p><div id="result" aria-live="polite"></div></div><footer>Only share support links with people you trust.</footer></main><script>
+const secret=document.getElementById('secret');
+const create=document.getElementById('create');
+const result=document.getElementById('result');
+const message=document.getElementById('message');
+function setMessage(text,isError=false){message.textContent=text;message.className=isError?'error':'success';}
+async function copyText(value,button){
+ try{await navigator.clipboard.writeText(value);button.textContent='Copied ✓';}
+ catch{window.prompt('Copy this link:',value);}
 }
-* { box-sizing: border-box; }
-html, body {
-  margin: 0;
-  min-height: 100vh;
-  background: var(--night);
-  color: var(--ink);
-  font-family: "Inter", Arial, sans-serif;
+function addLink(title,description,url,buttonText){
+ const card=document.createElement('section');card.className='link-card';
+ const h=document.createElement('h3');h.textContent=title;
+ const p=document.createElement('p');p.textContent=description;
+ const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=url;
+ const copy=document.createElement('button');copy.className='secondary';copy.textContent=buttonText;copy.addEventListener('click',()=>copyText(url,copy));
+ card.append(h,p,a,copy);result.append(card);
 }
-body { display: flex; flex-direction: column; align-items: center; padding: 28px 20px; }
-.mark {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--ink-soft);
-  margin-bottom: 36px;
+async function createInvitation(){
+ if(!secret.value){setMessage('Enter your owner password first.',true);secret.focus();return;}
+ create.disabled=true;create.textContent='Creating session…';setMessage('');result.replaceChildren();
+ try{
+  const response=await fetch('/api/invitations',{method:'POST',headers:{'Content-Type':'application/json','x-owner-secret':secret.value},body:'{}'});
+  let data;try{data=await response.json();}catch{throw Error('The server did not return a valid response.');}
+  if(!response.ok)throw Error(data.error||`Could not create session (${response.status}).`);
+  if(!data.grandpaUrl||!data.viewerUrl)throw Error('The server did not return both invitation links.');
+  addLink('1 · Share screen link','Send this link to the person who needs help.',data.grandpaUrl,'Copy sharing link');
+  addLink('2 · Viewer link','Open this on your phone or computer to watch.',data.viewerUrl,'Copy viewer link');
+  const note=document.createElement('p');note.className='hint';note.textContent='Links are private and time-limited. Use a fresh session for each new support call.';result.append(note);
+  setMessage('Session created. Your links are ready.');
+  secret.value='';
+ }catch(e){setMessage(e.message||'Something went wrong.',true);}
+ finally{create.disabled=false;create.textContent='Create support session';}
 }
-.mark svg { width: 20px; height: 20px; }
-.mark span {
-  font-family: "Fraunces", serif;
-  font-size: 19px;
-  font-weight: 500;
-  color: var(--ink);
-}
-main {
-  width: min(94%, 420px);
-  background: var(--panel);
-  border-radius: 20px;
-  padding: 36px 32px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
-}
-h1 {
-  font-family: "Fraunces", serif;
-  font-size: 26px;
-  font-weight: 500;
-  margin: 0 0 8px;
-}
-main > p.lead { color: var(--ink-soft); margin: 0 0 28px; font-size: 15px; line-height: 1.5; }
-label {
-  display: block;
-  font-size: 13px;
-  color: var(--ink-soft);
-  margin-bottom: 8px;
-}
-input {
-  width: 100%;
-  padding: 14px 16px;
-  margin-bottom: 22px;
-  border-radius: 10px;
-  border: 1px solid #2a3c56;
-  background: #0f1c2e;
-  color: var(--ink);
-  font-size: 16px;
-}
-input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
-button {
-  width: 100%;
-  padding: 17px;
-  background: var(--gold);
-  color: #1a1206;
-  border: 0;
-  border-radius: 12px;
-  font-size: 17px;
-  font-weight: 600;
-  cursor: pointer;
-}
-button:disabled { opacity: .5; cursor: default; }
-a { color: var(--gold); overflow-wrap: anywhere; }
-.result { margin-top: 24px; text-align: left; font-size: 15px; color: var(--ink-soft); }
-.result h3 { color: var(--ink); font-size: 14px; font-weight: 600; margin: 18px 0 6px; }
-.result h3:first-child { margin-top: 0; }
-.error { color: #e17b7b; }
-</style>
-</head>
-<body>
-<div class="mark">
-  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="12" cy="12" r="3" fill="currentColor"/>
-    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-  </svg>
-  <span>Support</span>
-</div>
-<main>
-  <h1>Create an invitation</h1>
-  <p class="lead">Generate a private link to connect.</p>
-
-  <label for="secret">Owner secret</label>
-  <input id="secret" type="password" autocomplete="off"
-         placeholder="Enter your secret">
-
-  <button id="create">Create invitation</button>
-  <div class="result" id="result" aria-live="polite"></div>
-</main>
-
-<script>
-const secret = document.getElementById("secret");
-const create = document.getElementById("create");
-const result = document.getElementById("result");
-
-function showError(message) {
-  result.innerHTML = "";
-  const p = document.createElement("p");
-  p.className = "error";
-  p.textContent = message;
-  result.append(p);
-}
-
-async function createInvitation() {
-  if (!secret.value) {
-    showError("Enter your owner secret.");
-    return;
-  }
-
-  create.disabled = true;
-  result.textContent = "Creating invitation...";
-
-  try {
-    const response = await fetch("/api/invitations", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-owner-secret": secret.value
-      },
-      body: "{}"
-    });
-
-    let data = null;
-    try {
-      data = await response.json();
-    } catch {
-      /* server returned something that is not JSON */
-    }
-
-    if (!response.ok || !data) {
-      throw new Error(
-        (data && data.error) ||
-        "Server error (" + response.status + "). Is the server running " +
-        "and is this page opened from the server's own address?"
-      );
-    }
-
-    result.innerHTML = "";
-
-    for (const [label, url] of [
-      ["Invitation link", data.grandpaUrl],
-      ["Your viewer link", data.viewerUrl]
-    ]) {
-      const heading = document.createElement("h3");
-      heading.textContent = label;
-
-      const link = document.createElement("a");
-      link.textContent = url;
-      if (/^https?:\/\//.test(url)) link.href = url;
-
-      const copy = document.createElement("button");
-      copy.textContent = "Copy " + label.toLowerCase();
-      copy.style.marginTop = "12px";
-      copy.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(url);
-          copy.textContent = "Copied";
-        } catch {
-          // Fallback: select the link text so it can be copied manually
-          const range = document.createRange();
-          range.selectNodeContents(link);
-          const sel = getSelection();
-          sel.removeAllRanges();
-          sel.addRange(range);
-          copy.textContent = "Press Ctrl+C to copy";
-        }
-      });
-
-      result.append(heading, link, copy);
-    }
-
-    const expiry = document.createElement("p");
-    expiry.style.marginTop = "18px";
-    expiry.textContent =
-      "Each link works once, and must be used within 30 minutes.";
-    result.append(expiry);
-  } catch (error) {
-    showError(error.message);
-  } finally {
-    create.disabled = false;
-  }
-}
-
-create.addEventListener("click", createInvitation);
-secret.addEventListener("keydown", e => {
-  if (e.key === "Enter") createInvitation();
-});
-</script>
-</body>
-</html>
+create.addEventListener('click',createInvitation);
+secret.addEventListener('keydown',e=>{if(e.key==='Enter')createInvitation();});
+</script></body></html>

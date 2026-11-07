@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101e31">
-  <title>Grandpa Connect — Mobile Viewer</title>
+  <title>Support — Session viewer</title>
   <style>
     :root { color-scheme: dark; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
     * { box-sizing: border-box; }
@@ -43,11 +43,24 @@
       .note { display:none; }
     }
   </style>
-</head>
+<style>
+:root{color-scheme:light!important;font-family:system-ui,-apple-system,"Segoe UI",sans-serif!important}
+body{background:#f1f5f9!important;color:#182b45!important}
+.app{background:#f1f5f9!important}
+header{background:#fff!important;border-bottom:1px solid #dce6f0!important;padding:15px 20px!important}
+header h1{color:#14253c!important;letter-spacing:-.6px!important;font-size:24px!important;margin:0 0 4px!important}
+#status{color:#526983!important}
+#viewport{background:#0d1828!important;border:1px solid #d7e1ee!important;border-radius:18px!important;box-shadow:0 8px 30px rgba(24,46,75,.08)!important}
+.toolbar button{background:#fff!important;color:#183452!important;border:1px solid #d5dfec!important;border-radius:12px!important;font-weight:700!important;box-shadow:0 2px 5px rgba(25,43,69,.03)!important}
+.toolbar button:hover{background:#edf4ff!important}
+#stop{background:#fff6f6!important;color:#a32532!important;border:1px solid #edc4c8!important}
+.note{color:#687990!important}
+#hint{background:rgba(15,30,47,.7)!important;color:white!important}
+</style></head>
 <body>
 <div class="app">
   <header>
-    <h1>❤️ Grandpa Connect</h1>
+    <h1>Support</h1>
     <p id="status" role="status" aria-live="polite">Connecting securely…</p>
   </header>
   <main class="workspace">
@@ -62,7 +75,7 @@
       <button type="button" id="fullscreen">⛶ Fullscreen</button>
       <button type="button" id="stop">End session</button>
     </nav>
-    <div class="note">Viewing only — tapping does not control Grandpa’s PC. He can stop sharing at any time.</div>
+    <div class="note">View only · The person sharing can stop at any time.</div>
   </main>
 </div>
 <script>
@@ -172,14 +185,14 @@ function createPeer(){
   if(peer!==current)return;
   video.srcObject=e.streams[0]||new MediaStream([e.track]);
   video.play().catch(()=>{});
-  setStatus('✅ Connected to Grandpa’s screen');
+  setStatus('✅ Screen connected');
  };
  current.onicecandidate=e=>{if(peer===current&&e.candidate)send('candidate',e.candidate);};
  current.onconnectionstatechange=()=>{
   if(peer!==current||finished)return;
   if(current.connectionState==='connected'){
    clearTimeout(brokenTimer);brokenTimer=null;
-   setStatus('✅ Connected to Grandpa’s screen');
+   setStatus('✅ Screen connected');
   }
   if(current.connectionState==='disconnected'){
    setStatus('Connection interrupted. Recovering…');
@@ -194,9 +207,9 @@ function createPeer(){
 async function processMessage(e){
  const m=JSON.parse(e.data);if(finished)return;
  if(m.type==='config'){iceServers=m.data?.iceServers||[];return;}
- if(m.type==='waiting'){dropPeer();setStatus('Waiting for Grandpa to start sharing…');return;}
- if(m.type==='peer-left'){dropPeer();setStatus('Grandpa disconnected. Waiting for reconnection…');return;}
- if(m.type==='paired'){createPeer();setStatus('Connecting to Grandpa’s screen…');return;}
+ if(m.type==='waiting'){dropPeer();setStatus('Waiting for screen sharing to begin…');return;}
+ if(m.type==='peer-left'){dropPeer();setStatus('Sharing paused. Waiting for reconnection…');return;}
+ if(m.type==='paired'){createPeer();setStatus('Connecting to shared screen…');return;}
  if(m.type==='offer'){
   if(!peer)createPeer();const current=peer,version=negotiation;
   await current.setRemoteDescription(m.data);if(version!==negotiation)return;

@@ -1,16 +1,23 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Grandpa Connect — Share Screen</title>
-<style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100dvh;background:#101e31;color:#fff;font:18px system-ui,Arial,sans-serif;display:grid;place-items:center;padding:22px}main{text-align:center;max-width:500px;width:100%}h1{font-size:clamp(28px,5vw,42px);margin:0 0 15px}p{line-height:1.55;color:#c6d5e6}button{border:0;border-radius:18px;background:#eab46c;color:#18120b;font-weight:800;font-size:clamp(22px,5vw,30px);padding:27px 18px;width:100%;cursor:pointer}button:disabled{opacity:.6;cursor:default}.stop{background:#342b36;color:#ffc4c4;border:1px solid #84525b;font-size:17px;padding:17px;margin-top:22px}.hidden{display:none}#status{min-height:3em;margin-top:22px}small{color:#b5c2d6;display:block;margin-top:15px}
-</style></head><body><main>
-<h1>❤️ Grandpa Connect</h1>
-<p id="guide">Press the big button, choose your screen and click Share.</p>
-<button id="share">Share my screen</button>
-<button id="stop" class="stop hidden">Stop sharing</button>
-<p id="status" role="status" aria-live="polite">Ready when you are.</p>
-<small>Screen sharing stays visible. You can stop it at any time.</small><small id="quality" aria-live="off">Video quality: automatic</small>
-</main><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Support — Share your screen</title><style>
+:root{color-scheme:light;--blue:#175cd3;--navy:#14253c;--text:#192c45;--muted:#607188;--border:#dde5ef;--card:#fff}*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;display:block;padding:0;background:#f3f6fa;color:var(--text);font:18px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{width:100%;padding:17px clamp(18px,5vw,64px);background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:15px}
+.brand{font-size:20px;font-weight:800;letter-spacing:-.6px;color:var(--navy);display:flex;align-items:center;gap:12px}.logo{display:grid;place-items:center;width:39px;height:39px;border-radius:12px;background:#e8efff;color:#1858be;font-size:21px;font-weight:900}
+.header-note{font-size:13px;color:#65768b}.wrap{min-height:calc(100dvh - 78px);display:grid;place-items:center;padding:34px 16px 45px}
+main{width:100%;max-width:610px;background:#fff;border:1px solid var(--border);border-radius:25px;box-shadow:0 20px 55px rgba(30,55,95,.07);padding:clamp(25px,5vw,50px);text-align:center}
+.icon-big{display:grid;place-items:center;margin:0 auto 24px;background:#eaf1ff;color:#1658c9;width:83px;height:83px;border-radius:23px;font-size:39px}
+h1{font-size:clamp(30px,6vw,44px);letter-spacing:-1.35px;line-height:1.15;margin:0 0 13px;font-weight:820;color:#14253c}
+.lead{font-size:clamp(17px,3vw,20px);color:#5e6e81;line-height:1.5;margin:0 0 30px}
+button{width:100%;border:none;border-radius:16px;background:#155bd4;color:#fff;font:800 clamp(22px,4.3vw,27px)/1.2 system-ui,sans-serif;padding:26px 14px;cursor:pointer;box-shadow:0 8px 18px rgba(21,91,212,.15)}button:hover{background:#104bae}button:focus-visible{outline:4px solid #99b8ff;outline-offset:4px}button:disabled{opacity:.55;cursor:default}.stop{margin:16px 0 0;background:#fff;color:#b42332;border:2px solid #efb8bd;font-size:20px;padding:17px;box-shadow:none}.stop:hover{background:#fff3f4}
+.hidden{display:none!important}.status{border:1px solid #dce6f2;border-radius:13px;margin-top:24px;padding:15px;background:#f6f9fd;min-height:56px;font-size:16px;font-weight:650;color:#314c71}
+footer{margin:22px auto 0;max-width:480px;color:#67758a;font-size:14px;line-height:1.5}.small{font-size:12px;color:#8491a2;margin-top:8px;display:block}
+@media(max-width:480px){header{padding:12px 18px}.header-note{display:none}.wrap{padding:18px 12px;align-items:start}main{border-radius:20px;padding:33px 23px}.lead{margin-bottom:27px}}
+</style></head><body>
+<header><div class="brand"><span class="logo" aria-hidden="true">✦</span>Support</div><span class="header-note">Simple, private screen sharing</span></header>
+<div class="wrap"><main><div class="icon-big" aria-hidden="true">▣</div><h1>Let's get you some help.</h1><p class="lead" id="guide">Press the button below, choose your screen, then click <strong>Share</strong> in the browser window.</p>
+<button id="share" type="button">Share my screen</button><button id="stop" type="button" class="stop hidden">Stop sharing</button><p id="status" role="status" aria-live="polite" class="status">Ready when you are.</p>
+<footer>You choose what to share. You can stop at any time.<span class="small">For Windows or Mac computers using Chrome or Edge.</span><span class="small" id="quality">Video quality: automatic</span></footer>
+</main></div><script>
 const token=new URLSearchParams(location.search).get('invite');
 const share=document.getElementById('share'),stop=document.getElementById('stop'),statusEl=document.getElementById('status'),qualityEl=document.getElementById('quality');
 let stream=null,socket=null,peer=null,iceServers=[],finished=false,retryTimer=null,retryCount=0,brokenTimer=null,negotiation=0,pending=[],waitingForAnswer=false,lastRestart=0;
